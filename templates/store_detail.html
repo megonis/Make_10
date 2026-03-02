@@ -1,0 +1,168 @@
+﻿{% extends "base.html" %}
+{% block content %}
+  <section class="card">
+    <div class="store-title-row">
+      <h2>{{ store.name }}</h2>
+      <button
+        type="button"
+        id="month-data-toggle"
+        class="icon-toggle"
+        aria-controls="month-data-panel"
+        aria-expanded="true"
+        title="Mostrar/ocultar dados do mês"
+      >
+        <span class="arrow">▾</span>
+      </button>
+    </div>
+
+    <div id="month-data-panel">
+      <form method="get" class="inline-form">
+        <label for="month">Mês de análise</label>
+        <input id="month" name="month" type="month" value="{{ month_token }}" />
+        <button type="submit">Atualizar</button>
+      </form>
+      <div class="kpi-grid">
+        <article class="kpi">
+          <small>Vendas no mês</small>
+          <strong>{{ money(data.total_sales_month) }}</strong>
+        </article>
+        <article class="kpi">
+          <small>Despesas fixas no mês</small>
+          <strong>{{ money(data.total_fixed_month) }}</strong>
+        </article>
+        <article class="kpi">
+          <small>Custo fixo por dia</small>
+          <strong>{{ money(data.fixed_per_day) }}</strong>
+        </article>
+        <article class="kpi">
+          <small>Resultado do mês</small>
+          <strong>{{ money(data.month_result) }}</strong>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="card priority-sale">
+    <h3>Nova Venda Diária</h3>
+    <form method="post" class="grid-form priority-sale-form">
+      <input type="hidden" name="action" value="sale" />
+      <label for="sale_date">Data da venda</label>
+      <input id="sale_date" name="sale_date" type="date" required />
+      <label for="amount">Valor da venda (R$)</label>
+      <input id="amount" name="amount" type="number" step="0.01" min="0" required />
+      <label for="notes">Observação</label>
+      <input id="notes" name="notes" placeholder="Opcional" />
+      <button type="submit">Salvar venda</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div>
+      <h3>Nova Despesa Fixa</h3>
+      <form method="post" class="grid-form">
+        <input type="hidden" name="action" value="expense" />
+        <label for="description">Descrição</label>
+        <input id="description" name="description" required placeholder="Aluguel, Energia..." />
+        <label for="monthly_amount">Valor mensal (R$)</label>
+        <input id="monthly_amount" name="monthly_amount" type="number" step="0.01" min="0" required />
+        <label for="start_date">Data de início</label>
+        <input id="start_date" name="start_date" type="date" />
+        <button type="submit">Salvar despesa</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Despesas Fixas Ativas</h3>
+    {% if data.expenses %}
+      <table>
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th>Valor mensal</th>
+            <th>Início</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for expense in data.expenses %}
+            <tr>
+              <td>{{ expense.description }}</td>
+              <td>{{ money(expense.monthly_amount) }}</td>
+              <td>{{ expense.start_date.strftime("%d/%m/%Y") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Nenhuma despesa fixa cadastrada para este mês.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h3>Resumo por dia trabalhado</h3>
+    {% if data.day_rows %}
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Venda do dia</th>
+            <th>Rateio fixo</th>
+            <th>Resultado do dia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in data.day_rows %}
+            <tr>
+              <td>{{ row.date.strftime("%d/%m/%Y") }}</td>
+              <td>{{ money(row.sales) }}</td>
+              <td>{{ money(row.fixed_allocated) }}</td>
+              <td>{{ money(row.result) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Não há dia para o mês selecionado.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h3>Últimas Vendas Lançadas</h3>
+    {% if recent_sales %}
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Valor</th>
+            <th>Observação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sale in recent_sales %}
+            <tr>
+              <td>{{ sale.sale_date.strftime("%d/%m/%Y") }}</td>
+              <td>{{ money(sale.amount) }}</td>
+              <td>{{ sale.notes or "-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Nenhuma venda cadastrada ainda.</p>
+    {% endif %}
+  </section>
+
+  <script>
+    (function () {
+      const btn = document.getElementById("month-data-toggle");
+      const panel = document.getElementById("month-data-panel");
+      if (!btn || !panel) return;
+
+      btn.addEventListener("click", function () {
+        const expanded = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", expanded ? "false" : "true");
+        panel.hidden = expanded;
+      });
+    })();
+  </script>
+{% endblock %}

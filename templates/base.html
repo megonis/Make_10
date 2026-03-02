@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Painel Financeiro de Lojas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <header class="header">
+      <div>
+        <h1><a href="{{ url_for('index') }}">Painel Financeiro</a></h1>
+      </div>
+      <nav>
+        <a href="{{ url_for('index') }}">Resumo</a>
+        <a href="{{ url_for('stores') }}">Lojas</a>
+      </nav>
+    </header>
+    {% if header_title %}
+      <div class="store-focus-header-wrap">
+        <div class="store-focus-header">{{ header_title }}</div>
+      </div>
+    {% endif %}
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

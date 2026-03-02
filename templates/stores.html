@@ -1,0 +1,27 @@
+﻿{% extends "base.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Lojas Cadastradas</h2>
+    {% if stores %}
+      <ul class="store-list">
+        {% for store in stores %}
+          <li>
+            <span>{{ store.name }}</span>
+            <a href="{{ url_for('store_detail', store_id=store.id) }}">Gerenciar</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Ainda não há lojas cadastradas.</p>
+    {% endif %}
+  </section>
+
+  <section class="card subtle-card">
+    <h2>Cadastrar Loja</h2>
+    <form method="post" class="grid-form">
+      <label for="name">Nome da loja</label>
+      <input id="name" name="name" required placeholder="Ex.: Loja Centro" />
+      <button type="submit">Adicionar loja</button>
+    </form>
+  </section>
+{% endblock %}

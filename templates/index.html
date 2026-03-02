@@ -1,0 +1,79 @@
+﻿{% extends "base.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Resumo Geral</h2>
+    <form method="get" class="inline-form">
+      <label for="month">Mês de Analise</label>
+      <input id="month" name="month" type="month" value="{{ month_token }}" />
+      <button type="submit">Atualizar</button>
+    </form>
+    <div class="kpi-grid">
+      <article class="kpi">
+        <small>Vendas totais</small>
+        <strong>{{ money(total_sales) }}</strong>
+      </article>
+      <article class="kpi">
+        <small>Despesas fixas</small>
+        <strong>{{ money(total_fixed) }}</strong>
+      </article>
+      <article class="kpi">
+        <small>Resultado do mês</small>
+        <strong>{{ money(total_result) }}</strong>
+      </article>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Lojas</h2>
+    {% if metrics %}
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Loja</th>
+            <th>Vendas no mês</th>
+            <th>Despesas fixas</th>
+            <th>Custo fixo por dia</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in metrics %}
+            <tr
+              class="summary-row-link"
+              data-href="{{ url_for('store_detail', store_id=item.store.id, month=month_token) }}"
+              tabindex="0"
+              role="link"
+              aria-label="Abrir {{ item.store.name }}"
+            >
+              <td data-label="Loja" class="store-name-cell">{{ item.store.name }}</td>
+              <td data-label="Vendas no mês">{{ money(item.data.total_sales_month) }}</td>
+              <td data-label="Despesas fixas">{{ money(item.data.total_fixed_month) }}</td>
+              <td data-label="Custo fixo por dia">{{ money(item.data.fixed_per_day) }}</td>
+              <td data-label="Resultado">{{ money(item.data.month_result) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Nenhuma loja cadastrada.</p>
+    {% endif %}
+  </section>
+  <script>
+    (function () {
+      const rows = document.querySelectorAll(".summary-row-link");
+      rows.forEach(function (row) {
+        const href = row.getAttribute("data-href");
+        if (!href) return;
+        row.addEventListener("click", function () {
+          window.location.href = href;
+        });
+        row.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            window.location.href = href;
+          }
+        });
+      });
+    })();
+  </script>
+{% endblock %}
