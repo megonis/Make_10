@@ -13,7 +13,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 
 app = Flask(__name__)
-database_url = os.getenv("DATABASE_URL", "sqlite:///finance.db")
+is_vercel = bool(os.getenv("VERCEL"))
+database_url = os.getenv("DATABASE_URL")
+if not database_url:
+    if is_vercel:
+        raise RuntimeError("DATABASE_URL is required in production.")
+    database_url = "sqlite:///finance.db"
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
