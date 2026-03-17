@@ -7,15 +7,20 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
-    <header class="header">
-      <div>
-        <h1><a href="{{ url_for('index') }}">Painel Financeiro</a></h1>
-      </div>
-      <nav>
-        <a href="{{ url_for('index') }}">Resumo</a>
-        <a href="{{ url_for('stores') }}">Lojas</a>
-      </nav>
-    </header>
+    {% if is_authenticated %}
+      <header class="header">
+        <div>
+          <h1><a href="{{ url_for('index') }}">Painel Financeiro</a></h1>
+        </div>
+        <nav>
+          <a href="{{ url_for('index') }}">Resumo</a>
+          <a href="{{ url_for('stores') }}">Lojas</a>
+          <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+            <button type="submit" class="ghost-button">Sair</button>
+          </form>
+        </nav>
+      </header>
+    {% endif %}
     {% if header_title %}
       <div class="store-focus-header-wrap">
         <div class="store-focus-header">{{ header_title }}</div>

@@ -1,16 +1,25 @@
-﻿# Painel Financeiro Multi-loja
+# Painel Financeiro Multi-loja
 
 Sistema web em Python para controlar:
-- cadastro de lojas (escalável para quantas lojas precisar);
+- cadastro de lojas;
 - despesas fixas mensais por loja;
-- vendas diárias por loja;
-- rateio automático das despesas fixas em dias úteis (segunda a sábado).
+- vendas diarias por loja;
+- rateio automatico das despesas fixas em dias uteis (segunda a sabado).
 
 ## Stack
 - Flask
 - Flask-SQLAlchemy
-- PostgreSQL (Neon em produção)
+- Flask-Migrate
+- PostgreSQL (Neon em producao)
 - Vercel (deploy)
+
+## ORM e migrations
+
+Neste projeto, o equivalente ao Prisma foi substituido por:
+- `SQLAlchemy` para modelos, relacionamentos e queries
+- `Flask-Migrate` para migrations versionadas
+
+Essa e a stack correta para um backend Flask/Python.
 
 ## Rodar localmente
 
@@ -20,60 +29,62 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-2. Instale as dependências:
+2. Instale as dependencias:
 ```powershell
 pip install -r requirements.txt
 ```
 
-3. (Opcional) Configure `DATABASE_URL` para usar Postgres local/remoto.
-Sem `DATABASE_URL`, o app usa SQLite local (`finance.db`).
+3. Configure o banco:
+- sem `DATABASE_URL`, o app usa SQLite local
+- com `DATABASE_URL`, o app usa PostgreSQL/Neon
 
-4. Execute:
+Exemplo no PowerShell:
+```powershell
+$env:DATABASE_URL="postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require"
+```
+
+4. Inicialize migrations na primeira vez:
+```powershell
+flask --app app db init
+flask --app app db migrate -m "initial schema"
+flask --app app db upgrade
+```
+
+5. Rode o projeto:
 ```powershell
 python app.py
 ```
 
-5. Abra no navegador:
+6. Abra no navegador:
 `http://127.0.0.1:5000`
 
-## Regras de cálculo implementadas
+## Fluxo de banco daqui para frente
 
-- O custo fixo mensal de cada loja é a soma das despesas fixas ativas no mês.
-- O custo fixo diário é `total_fixos_mensal / quantidade_de_dias_uteis_no_mes`.
-- Dias úteis considerados: segunda a sábado (domingo excluído).
-- Resultado mensal da loja: `vendas_no_mes - fixos_no_mes`.
-- Resultado diário: `venda_do_dia - rateio_fixo_do_dia`.
+Quando voce alterar os modelos em [app.py](c:\Users\Lucas\Desktop\MAKE10\app.py), rode:
 
-## Deploy em produção (Vercel + Neon)
+```powershell
+flask --app app db migrate -m "describe change"
+flask --app app db upgrade
+```
 
-### 1. Criar banco no Neon
-1. No Neon, crie um projeto e um database Postgres.
-2. Copie a connection string (algo como):
+## Neon
+
+Use a connection string do Neon em `DATABASE_URL`, por exemplo:
+
 ```text
 postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 ```
 
-### 2. Subir projeto no GitHub
-1. Crie um repositório no GitHub.
-2. Faça commit e push deste projeto.
+## Deploy
 
-### 3. Importar no Vercel
-1. No Vercel, clique em **Add New > Project**.
-2. Selecione o repositório.
-3. Framework: pode deixar auto-detect.
-4. Deploy.
+O deploy em Vercel continua usando:
+- [api/index.py](c:\Users\Lucas\Desktop\MAKE10\api\index.py)
+- [vercel.json](c:\Users\Lucas\Desktop\MAKE10\vercel.json)
 
-### 4. Configurar variável de ambiente no Vercel
-No projeto Vercel, vá em **Settings > Environment Variables** e adicione:
-- `DATABASE_URL` = sua URL do Neon
+Em producao:
+1. configure `DATABASE_URL` no Vercel
+2. rode as migrations contra o banco Neon antes de usar o app
 
-Depois, faça **Redeploy**.
+## Observacao importante
 
-### 5. Estrutura de deploy já pronta neste projeto
-- `api/index.py` (entrypoint serverless da Vercel)
-- `vercel.json` (roteia todas as rotas para Flask)
-
-## Observações importantes
-
-- Em produção, use sempre Postgres (Neon). SQLite não é persistente em ambiente serverless.
-- O app cria tabelas automaticamente na inicialização da função.
+`db.create_all()` nao e mais a estrategia principal. Agora o schema deve ser controlado por migrations.

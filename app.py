@@ -6,7 +6,8 @@ from datetime import date, datetime
 from decimal import Decimal
 import os
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, session, url_for
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
 
@@ -15,6 +16,8 @@ database_url = os.getenv("DATABASE_URL", "sqlite:///finance.db")
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "make10-dev-secret-key")
+app.config["ADMIN_PASSWORD"] = os.getenv("ADMIN_PASSWORD", "admin123")
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
@@ -22,6 +25,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
 class Store(db.Model):
@@ -76,6 +80,10 @@ def money(value: Decimal | float | int) -> str:
     return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def is_authenticated() -> bool:
+    return session.get("is_authenticated", False) is True
+
+
 def month_store_metrics(store: Store, year: int, month: int) -> dict:
     start = date(year, month, 1)
     end = date(year, month, monthrange(year, month)[1])
@@ -128,7 +136,17 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
 
 @app.context_processor
 def inject_helpers():
-    return {"money": money}
+    return {"money": money, "is_authenticated": is_authenticated()}
+
+
+@app.before_request
+def require_login():
+    allowed_endpoints = {"login", "static"}
+    if request.endpoint in allowed_endpoints:
+        return None
+    if not is_authenticated():
+        return redirect(url_for("login"))
+    return None
 
 
 @app.after_request
@@ -163,6 +181,28 @@ def index():
         total_fixed=total_fixed,
         total_result=total_sales - total_fixed,
     )
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if is_authenticated():
+        return redirect(url_for("index"))
+
+    error_message = None
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == app.config["ADMIN_PASSWORD"]:
+            session["is_authenticated"] = True
+            return redirect(url_for("index"))
+        error_message = "Senha incorreta."
+
+    return render_template("login.html", error_message=error_message)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/stores", methods=["GET", "POST"])
@@ -241,12 +281,5 @@ def store_detail(store_id: int):
         header_title=f"Loja: {store.name}",
     )
 
-
-def ensure_database():
-    with app.app_context():
-        db.create_all()
-
-
 if __name__ == "__main__":
-    ensure_database()
     app.run(debug=True, use_reloader=True)

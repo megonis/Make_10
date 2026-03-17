@@ -1,21 +1,19 @@
 ﻿{% extends "base.html" %}
 {% block content %}
   <section class="card">
-    <div class="store-title-row">
+    <button
+      type="button"
+      id="month-data-toggle"
+      class="store-title-row"
+      aria-controls="month-data-panel"
+      aria-expanded="false"
+      title="Mostrar/ocultar dados do mês"
+    >
       <h2>{{ store.name }}</h2>
-      <button
-        type="button"
-        id="month-data-toggle"
-        class="icon-toggle"
-        aria-controls="month-data-panel"
-        aria-expanded="true"
-        title="Mostrar/ocultar dados do mês"
-      >
-        <span class="arrow">▾</span>
-      </button>
-    </div>
+      <span class="arrow">^</span>
+    </button>
 
-    <div id="month-data-panel">
+    <div id="month-data-panel" hidden>
       <form method="get" class="inline-form">
         <label for="month">Mês de análise</label>
         <input id="month" name="month" type="month" value="{{ month_token }}" />

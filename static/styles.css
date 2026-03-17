@@ -14,7 +14,9 @@
 body {
   margin: 0;
   font-family: "Segoe UI", sans-serif;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at top left, #d9f3ef 0, transparent 24%),
+    linear-gradient(180deg, #f8fbfd 0%, #f3f6fa 100%);
   color: var(--text);
 }
 
@@ -50,6 +52,7 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  gap: 10px;
 }
 
 .container {
@@ -103,38 +106,50 @@ body {
   background: #64748b;
 }
 
+.logout-form {
+  margin: 0;
+}
+
+.ghost-button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
 .store-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
 }
 
 .store-title-row h2 {
   margin: 0;
+  text-align: left;
 }
 
-.icon-toggle {
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--border);
-  background: #f8fafc;
-  color: var(--text);
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.icon-toggle .arrow {
+.store-title-row .arrow {
   transition: transform 0.2s ease;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
   line-height: 1;
+  transform: rotate(180deg);
 }
 
-.icon-toggle[aria-expanded="false"] .arrow {
-  transform: rotate(-90deg);
+.store-title-row[aria-expanded="true"] .arrow {
+  transform: rotate(0deg);
+}
+
+.store-title-row:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 4px;
 }
 
 #month-data-panel[hidden] {
@@ -257,6 +272,46 @@ td {
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
   padding: 10px 0;
+}
+
+.login-shell {
+  min-height: calc(100vh - 48px);
+  display: grid;
+  place-items: center;
+}
+
+.login-card {
+  width: min(100%, 420px);
+  padding: 28px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d8e3ec;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.login-eyebrow {
+  margin: 0 0 8px;
+  color: #0f766e;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-card h2 {
+  margin: 0;
+}
+
+.login-copy {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.95rem;
 }
 
 @media (max-width: 700px) {

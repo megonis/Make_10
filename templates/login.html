@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="login-shell">
+    <div class="login-card">
+      <p class="login-eyebrow">Acesso administrativo</p>
+      <h2>Entrar no Painel</h2>
+      <p class="login-copy">Use a senha padrão de administrador para acessar o sistema.</p>
+
+      <form method="post" class="grid-form">
+        <label for="password">Senha</label>
+        <input id="password" name="password" type="password" required autofocus />
+        {% if error_message %}
+          <p class="form-error">{{ error_message }}</p>
+        {% endif %}
+        <button type="submit">Entrar</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

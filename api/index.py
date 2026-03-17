@@ -1,5 +1,3 @@
-﻿from app import app, ensure_database
-
-ensure_database()
+from app import app
 
 # Vercel expects a module-level variable called `app`.
