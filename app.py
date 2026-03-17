@@ -9,8 +9,11 @@ import os
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 
+
+load_dotenv()
 
 app = Flask(__name__)
 is_vercel = bool(os.getenv("VERCEL"))
