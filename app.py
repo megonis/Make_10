@@ -6,9 +6,10 @@ from datetime import date, datetime
 from decimal import Decimal
 import os
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 
 
 app = Flask(__name__)
@@ -84,6 +85,11 @@ def is_authenticated() -> bool:
     return session.get("is_authenticated", False) is True
 
 
+def parse_decimal_input(value: str, default: str = "0") -> Decimal:
+    normalized = (value or default).strip().replace(",", ".")
+    return Decimal(normalized)
+
+
 def month_store_metrics(store: Store, year: int, month: int) -> dict:
     start = date(year, month, 1)
     end = date(year, month, monthrange(year, month)[1])
@@ -151,7 +157,7 @@ def require_login():
 
 @app.after_request
 def disable_cache_in_debug(response):
-    if app.debug:
+    if request.endpoint != "static":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -212,8 +218,16 @@ def stores():
         if name:
             existing = Store.query.filter(db.func.lower(Store.name) == name.lower()).first()
             if not existing:
-                db.session.add(Store(name=name))
-                db.session.commit()
+                try:
+                    db.session.add(Store(name=name))
+                    db.session.commit()
+                    flash("Loja cadastrada com sucesso.", "success")
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    app.logger.exception("Erro ao cadastrar loja.")
+                    flash("Nao foi possivel cadastrar a loja.", "error")
+            else:
+                flash("Ja existe uma loja com esse nome.", "error")
         return redirect(url_for("stores"))
     return render_template("stores.html", stores=Store.query.order_by(Store.name).all())
 
@@ -229,38 +243,50 @@ def store_detail(store_id: int):
         action = request.form.get("action")
         if action == "expense":
             description = request.form.get("description", "").strip()
-            monthly_amount = request.form.get("monthly_amount", "0").replace(",", ".")
+            monthly_amount_raw = request.form.get("monthly_amount", "0")
             start_date_raw = request.form.get("start_date")
             if description:
-                start_date_value = (
-                    datetime.strptime(start_date_raw, "%Y-%m-%d").date()
-                    if start_date_raw
-                    else date.today()
-                )
-                db.session.add(
-                    FixedExpense(
-                        store_id=store.id,
-                        description=description,
-                        monthly_amount=Decimal(monthly_amount),
-                        start_date=start_date_value,
-                        active=True,
+                try:
+                    start_date_value = (
+                        datetime.strptime(start_date_raw, "%Y-%m-%d").date()
+                        if start_date_raw
+                        else date.today()
                     )
-                )
-                db.session.commit()
+                    db.session.add(
+                        FixedExpense(
+                            store_id=store.id,
+                            description=description,
+                            monthly_amount=parse_decimal_input(monthly_amount_raw),
+                            start_date=start_date_value,
+                            active=True,
+                        )
+                    )
+                    db.session.commit()
+                    flash("Despesa cadastrada com sucesso.", "success")
+                except (ArithmeticError, ValueError, SQLAlchemyError):
+                    db.session.rollback()
+                    app.logger.exception("Erro ao cadastrar despesa fixa.")
+                    flash("Nao foi possivel salvar a despesa.", "error")
         elif action == "sale":
             sale_date_raw = request.form.get("sale_date")
-            amount = request.form.get("amount", "0").replace(",", ".")
+            amount_raw = request.form.get("amount", "0")
             notes = request.form.get("notes", "").strip() or None
             if sale_date_raw:
-                db.session.add(
-                    DailySale(
-                        store_id=store.id,
-                        sale_date=datetime.strptime(sale_date_raw, "%Y-%m-%d").date(),
-                        amount=Decimal(amount),
-                        notes=notes,
+                try:
+                    db.session.add(
+                        DailySale(
+                            store_id=store.id,
+                            sale_date=datetime.strptime(sale_date_raw, "%Y-%m-%d").date(),
+                            amount=parse_decimal_input(amount_raw),
+                            notes=notes,
+                        )
                     )
-                )
-                db.session.commit()
+                    db.session.commit()
+                    flash("Venda diaria salva com sucesso.", "success")
+                except (ArithmeticError, ValueError, SQLAlchemyError):
+                    db.session.rollback()
+                    app.logger.exception("Erro ao salvar venda diaria.")
+                    flash("Nao foi possivel salvar a venda diaria.", "error")
 
         return redirect(url_for("store_detail", store_id=store.id, month=month_token))
 

@@ -63,6 +63,30 @@ body {
   gap: 16px;
 }
 
+.flash-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.flash {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.flash-success {
+  border-color: #9dd6c7;
+  background: #ecfdf5;
+  color: #0f5132;
+}
+
+.flash-error {
+  border-color: #efb0aa;
+  background: #fef2f2;
+  color: #8a1c1c;
+}
+
 .store-focus-header-wrap {
   position: sticky;
   top: 0;

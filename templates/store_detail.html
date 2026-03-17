@@ -14,7 +14,7 @@
     </button>
 
     <div id="month-data-panel" hidden>
-      <form method="get" class="inline-form">
+      <form method="get" class="inline-form" autocomplete="off">
         <label for="month">Mês de análise</label>
         <input id="month" name="month" type="month" value="{{ month_token }}" />
         <button type="submit">Atualizar</button>
@@ -42,14 +42,14 @@
 
   <section class="card priority-sale">
     <h3>Nova Venda Diária</h3>
-    <form method="post" class="grid-form priority-sale-form">
+    <form method="post" class="grid-form priority-sale-form" autocomplete="off">
       <input type="hidden" name="action" value="sale" />
       <label for="sale_date">Data da venda</label>
-      <input id="sale_date" name="sale_date" type="date" required />
+      <input id="sale_date" name="sale_date" type="date" required autocomplete="off" />
       <label for="amount">Valor da venda (R$)</label>
-      <input id="amount" name="amount" type="number" step="0.01" min="0" required />
+      <input id="amount" name="amount" type="number" step="0.01" min="0" required autocomplete="off" />
       <label for="notes">Observação</label>
-      <input id="notes" name="notes" placeholder="Opcional" />
+      <input id="notes" name="notes" placeholder="Opcional" autocomplete="off" />
       <button type="submit">Salvar venda</button>
     </form>
   </section>
@@ -57,14 +57,14 @@
   <section class="card">
     <div>
       <h3>Nova Despesa Fixa</h3>
-      <form method="post" class="grid-form">
+      <form method="post" class="grid-form" autocomplete="off">
         <input type="hidden" name="action" value="expense" />
         <label for="description">Descrição</label>
-        <input id="description" name="description" required placeholder="Aluguel, Energia..." />
+        <input id="description" name="description" required placeholder="Aluguel, Energia..." autocomplete="off" />
         <label for="monthly_amount">Valor mensal (R$)</label>
-        <input id="monthly_amount" name="monthly_amount" type="number" step="0.01" min="0" required />
+        <input id="monthly_amount" name="monthly_amount" type="number" step="0.01" min="0" required autocomplete="off" />
         <label for="start_date">Data de início</label>
-        <input id="start_date" name="start_date" type="date" />
+        <input id="start_date" name="start_date" type="date" autocomplete="off" />
         <button type="submit">Salvar despesa</button>
       </form>
     </div>

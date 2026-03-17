@@ -6,9 +6,9 @@
       <h2>Entrar no Painel</h2>
       <p class="login-copy">Use a senha padrão de administrador para acessar o sistema.</p>
 
-      <form method="post" class="grid-form">
+      <form method="post" class="grid-form" autocomplete="off">
         <label for="password">Senha</label>
-        <input id="password" name="password" type="password" required autofocus />
+        <input id="password" name="password" type="password" required autofocus autocomplete="new-password" />
         {% if error_message %}
           <p class="form-error">{{ error_message }}</p>
         {% endif %}
