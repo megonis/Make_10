@@ -77,13 +77,17 @@ postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 
 ## Deploy
 
-O deploy em Vercel continua usando:
-- [api/index.py](c:\Users\Lucas\Desktop\MAKE10\api\index.py)
-- [vercel.json](c:\Users\Lucas\Desktop\MAKE10\vercel.json)
+O deploy em Vercel pode ser feito sem configuracao extra:
+- a Vercel detecta o projeto Flask a partir de [app.py](c:\Users\Lucas\Desktop\MAKE10\app.py)
+- use a raiz do repositorio como `Root Directory`
 
 Em producao:
 1. configure `DATABASE_URL` no Vercel
-2. rode as migrations contra o banco Neon antes de usar o app
+2. configure `SECRET_KEY` no Vercel
+3. configure `ADMIN_PASSWORD` no Vercel
+4. rode as migrations contra o banco Neon antes de usar o app
+
+Se a Vercel reclamar de preset, selecione `Other` ou `Flask` e mantenha a raiz do projeto.
 
 ## Observacao importante
 
