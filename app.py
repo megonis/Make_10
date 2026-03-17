@@ -17,11 +17,14 @@ load_dotenv()
 
 app = Flask(__name__)
 is_vercel = bool(os.getenv("VERCEL"))
-database_url = os.getenv("DATABASE_URL")
+database_url = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
+missing_production_database = False
 if not database_url:
     if is_vercel:
-        raise RuntimeError("DATABASE_URL is required in production.")
-    database_url = "sqlite:///finance.db"
+        missing_production_database = True
+        database_url = "sqlite:///:memory:"
+    else:
+        database_url = "sqlite:///finance.db"
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
@@ -158,6 +161,12 @@ def require_login():
     allowed_endpoints = {"login", "static"}
     if request.endpoint in allowed_endpoints:
         return None
+    if missing_production_database:
+        return (
+            "DATABASE_URL is missing in production. Configure DATABASE_URL in Vercel "
+            "Environment Variables and redeploy.",
+            500,
+        )
     if not is_authenticated():
         return redirect(url_for("login"))
     return None
