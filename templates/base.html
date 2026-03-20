@@ -9,15 +9,17 @@
   <body>
     {% if is_authenticated %}
       <header class="header">
-        <div>
-          <h1><a href="{{ url_for('index') }}">Painel Financeiro</a></h1>
+        <div class="header-brand">
+          <div class="brand-copy">
+            <h1><a href="{{ url_for('index') }}">Painel Financeiro</a></h1>
+            <p>Controle financeiro das lojas</p>
+          </div>
         </div>
-        <nav>
-          <a href="{{ url_for('index') }}">Resumo</a>
-          <a href="{{ url_for('stores') }}">Lojas</a>
-          <form method="post" action="{{ url_for('logout') }}" class="logout-form">
-            <button type="submit" class="ghost-button">Sair</button>
-          </form>
+        <nav class="main-nav">
+          <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}is-active{% endif %}">Resumo</a>
+          <a href="{{ url_for('stores') }}" class="nav-link {% if request.endpoint == 'stores' or request.endpoint == 'store_detail' %}is-active{% endif %}">Lojas</a>
+          <a href="{{ url_for('payables') }}" class="nav-link {% if request.endpoint == 'payables' or request.endpoint == 'update_payable' %}is-active{% endif %}">Contas a Pagar</a>
+          <a href="{{ url_for('outflows') }}" class="nav-link {% if request.endpoint == 'outflows' or request.endpoint == 'update_outflow' %}is-active{% endif %}">Saidas</a>
         </nav>
       </header>
     {% endif %}

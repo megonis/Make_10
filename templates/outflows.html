@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="card">
+    <h2>Saidas</h2>
+    <form method="get" class="inline-form" autocomplete="off">
+      <label for="month">Mes de analise</label>
+      <input id="month" name="month" type="month" value="{{ month_token }}" />
+      <button type="submit">Atualizar</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <button type="button" class="payables-section-toggle" data-toggle-panel="outflows-panel" aria-expanded="false">
+      <span class="payables-section-copy">
+        <strong>Saidas do Mes</strong>
+        <small>{{ outflows|length }} saida{{ "" if outflows|length == 1 else "s" }} cadastrada{{ "" if outflows|length == 1 else "s" }}</small>
+      </span>
+      <span class="arrow">^</span>
+    </button>
+
+    <div id="outflows-panel" class="payables-panel" hidden>
+      {% if outflows %}
+        <div class="payables-grid">
+          {% for outflow in outflows %}
+            {% set count = outflow.stores|length %}
+            <button type="button" class="payable-card" data-dialog-id="outflow-dialog-{{ outflow.id }}">
+              <div class="payable-card-top">
+                <strong>{{ outflow.description }}</strong>
+                <span class="status-badge status-paid">Pago</span>
+              </div>
+              <div class="payable-card-body">
+                <div>
+                  <small>Data</small>
+                  <span>{{ outflow.outflow_date.strftime("%d/%m/%Y") }}</span>
+                </div>
+                <div>
+                  <small>Valor total</small>
+                  <span>{{ money(outflow.total_amount) }}</span>
+                </div>
+                <div>
+                  <small>Rateio por loja</small>
+                  <span>{{ money(outflow.total_amount / count if count else 0) }}</span>
+                </div>
+                <div>
+                  <small>Categoria</small>
+                  <span>{{ outflow.category or "-" }}</span>
+                </div>
+                <div>
+                  <small>Lojas</small>
+                  <span>{{ outflow.stores | map(attribute='name') | join(', ') }}</span>
+                </div>
+              </div>
+            </button>
+
+            <dialog id="outflow-dialog-{{ outflow.id }}" class="payable-dialog">
+              <form method="dialog" class="dialog-close-row">
+                <button type="submit" class="dialog-close">Fechar</button>
+              </form>
+              <div class="dialog-header">
+                <h3>{{ outflow.description }}</h3>
+                <span class="status-badge status-paid">Pago</span>
+              </div>
+              <form method="post" action="{{ url_for('update_outflow', outflow_id=outflow.id) }}" class="grid-form payable-form" autocomplete="off">
+                <label for="description-{{ outflow.id }}">Descricao</label>
+                <input id="description-{{ outflow.id }}" name="description" value="{{ outflow.description }}" required />
+
+                <label for="total_amount-{{ outflow.id }}">Valor total (R$)</label>
+                <input id="total_amount-{{ outflow.id }}" name="total_amount" type="number" step="0.01" min="0" value="{{ outflow.total_amount }}" required />
+
+                <label for="outflow_date-{{ outflow.id }}">Data da saida</label>
+                <input id="outflow_date-{{ outflow.id }}" name="outflow_date" type="date" value="{{ outflow.outflow_date.strftime('%Y-%m-%d') }}" required />
+
+                <label for="category-{{ outflow.id }}">Categoria</label>
+                <input id="category-{{ outflow.id }}" name="category" value="{{ outflow.category or '' }}" placeholder="Limpeza, manutencao, compra..." />
+
+                <label for="notes-{{ outflow.id }}">Observacao</label>
+                <input id="notes-{{ outflow.id }}" name="notes" value="{{ outflow.notes or '' }}" />
+
+                <div class="store-checkbox-group">
+                  <span>Lojas que vao receber o rateio</span>
+                  {% for store in stores %}
+                    <label class="store-checkbox">
+                      <input
+                        type="checkbox"
+                        name="store_ids"
+                        value="{{ store.id }}"
+                        {% if store in outflow.stores %}checked{% endif %}
+                      />
+                      <span>{{ store.name }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+
+                <button type="submit">Salvar alteracoes</button>
+              </form>
+            </dialog>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="payables-empty">Nenhuma saida cadastrada para o mes selecionado.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card subtle-card">
+    <h3>Adicionar Saida</h3>
+    <form method="post" class="grid-form payable-form" autocomplete="off">
+      <label for="description">Descricao</label>
+      <input id="description" name="description" required placeholder="Material de limpeza, manutencao, frete..." />
+
+      <label for="total_amount">Valor total (R$)</label>
+      <input id="total_amount" name="total_amount" type="number" step="0.01" min="0" required />
+
+      <label for="outflow_date">Data da saida</label>
+      <input id="outflow_date" name="outflow_date" type="date" required />
+
+      <label for="category">Categoria</label>
+      <input id="category" name="category" placeholder="Opcional" />
+
+      <label for="notes">Observacao</label>
+      <input id="notes" name="notes" placeholder="Opcional" />
+
+      <div class="store-checkbox-group">
+        <span>Lojas que vao receber o rateio</span>
+        {% for store in stores %}
+          <label class="store-checkbox">
+            <input type="checkbox" name="store_ids" value="{{ store.id }}" />
+            <span>{{ store.name }}</span>
+          </label>
+        {% endfor %}
+      </div>
+
+      <button type="submit">Salvar saida</button>
+    </form>
+  </section>
+
+  <script>
+    (function () {
+      const toggles = document.querySelectorAll("[data-toggle-panel]");
+      toggles.forEach(function (toggle) {
+        toggle.addEventListener("click", function () {
+          const panel = document.getElementById(toggle.getAttribute("data-toggle-panel"));
+          if (!panel) {
+            return;
+          }
+
+          const willExpand = panel.hasAttribute("hidden");
+          panel.toggleAttribute("hidden");
+          toggle.setAttribute("aria-expanded", String(willExpand));
+        });
+      });
+
+      const buttons = document.querySelectorAll("[data-dialog-id]");
+      const setBodyScroll = function () {
+        const hasOpenDialog = document.querySelector("dialog[open]");
+        document.body.classList.toggle("modal-open", Boolean(hasOpenDialog));
+      };
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          const dialog = document.getElementById(button.getAttribute("data-dialog-id"));
+          if (dialog && typeof dialog.showModal === "function") {
+            dialog.showModal();
+            setBodyScroll();
+          }
+        });
+      });
+
+      const dialogs = document.querySelectorAll("dialog");
+      dialogs.forEach(function (dialog) {
+        dialog.addEventListener("close", setBodyScroll);
+        dialog.addEventListener("cancel", setBodyScroll);
+      });
+    })();
+  </script>
+{% endblock %}

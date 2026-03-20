@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block content %}
+  {% set open_payables = payables | rejectattr("is_paid") | list %}
+  {% set paid_payables = payables | selectattr("is_paid") | list %}
+  {% set overdue_payables = open_payables | selectattr("due_date", "lt", today) | list %}
+  {% set upcoming_payables = open_payables | rejectattr("due_date", "lt", today) | list %}
+
+  {% macro render_payable_cards(items) %}
+    <div class="payables-grid">
+      {% for payable in items %}
+        {% set count = payable.stores|length %}
+        {% set is_overdue = (not payable.is_paid) and payable.due_date < today %}
+        {% set status_label = "Paga" if payable.is_paid else ("Vencida" if is_overdue else "Em aberto") %}
+        {% set status_class = "paid" if payable.is_paid else ("overdue" if is_overdue else "open") %}
+        <button type="button" class="payable-card" data-dialog-id="payable-dialog-{{ payable.id }}">
+          <div class="payable-card-top">
+            <strong>{{ payable.description }}</strong>
+            <span class="status-badge status-{{ status_class }}">{{ status_label }}</span>
+          </div>
+          <div class="payable-card-body">
+            <div>
+              <small>Vencimento</small>
+              <span>{{ payable.due_date.strftime("%d/%m/%Y") }}</span>
+            </div>
+            <div>
+              <small>Valor total</small>
+              <span>{{ money(payable.total_amount) }}</span>
+            </div>
+            <div>
+              <small>Rateio por loja</small>
+              <span>{{ money(payable.total_amount / count if count else 0) }}</span>
+            </div>
+            <div>
+              <small>Lojas</small>
+              <span>{{ payable.stores | map(attribute='name') | join(', ') }}</span>
+            </div>
+          </div>
+        </button>
+
+        <dialog id="payable-dialog-{{ payable.id }}" class="payable-dialog">
+          <form method="dialog" class="dialog-close-row">
+            <button type="submit" class="dialog-close">Fechar</button>
+          </form>
+          <div class="dialog-header">
+            <h3>{{ payable.description }}</h3>
+            <span class="status-badge status-{{ status_class }}">{{ status_label }}</span>
+          </div>
+          <form method="post" action="{{ url_for('update_payable', payable_id=payable.id) }}" class="grid-form payable-form" autocomplete="off">
+            <label for="description-{{ payable.id }}">Descricao</label>
+            <input id="description-{{ payable.id }}" name="description" value="{{ payable.description }}" required />
+
+            <label for="total_amount-{{ payable.id }}">Valor total (R$)</label>
+            <input id="total_amount-{{ payable.id }}" name="total_amount" type="number" step="0.01" min="0" value="{{ payable.total_amount }}" required />
+
+            <label for="due_date-{{ payable.id }}">Vencimento</label>
+            <input id="due_date-{{ payable.id }}" name="due_date" type="date" value="{{ payable.due_date.strftime('%Y-%m-%d') }}" required />
+
+            <label for="notes-{{ payable.id }}">Observacao</label>
+            <input id="notes-{{ payable.id }}" name="notes" value="{{ payable.notes or '' }}" />
+
+            <label class="status-toggle">
+              <input type="checkbox" name="is_paid" {% if payable.is_paid %}checked{% endif %} />
+              <span>Conta paga</span>
+            </label>
+
+            <div class="store-checkbox-group">
+              <span>Lojas que vao receber o rateio</span>
+              {% for store in stores %}
+                <label class="store-checkbox">
+                  <input
+                    type="checkbox"
+                    name="store_ids"
+                    value="{{ store.id }}"
+                    {% if store in payable.stores %}checked{% endif %}
+                  />
+                  <span>{{ store.name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+
+            <button type="submit">Salvar alteracoes</button>
+          </form>
+        </dialog>
+      {% endfor %}
+    </div>
+  {% endmacro %}
+
+  <section class="card">
+    <h2>Contas a Pagar</h2>
+    <form method="get" class="inline-form" autocomplete="off">
+      <label for="month">Mes de analise</label>
+      <input id="month" name="month" type="month" value="{{ month_token }}" />
+      <button type="submit">Atualizar</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <button type="button" class="payables-section-toggle" data-toggle-panel="open-payables-panel" aria-expanded="false">
+      <span class="payables-section-copy">
+        <strong>Contas a Pagar</strong>
+        <small>
+          {{ upcoming_payables|length }} conta{{ "" if upcoming_payables|length == 1 else "s" }} a pagar
+          <br />
+          {{ overdue_payables|length }} conta{{ "" if overdue_payables|length == 1 else "s" }} vencida{{ "" if overdue_payables|length == 1 else "s" }}
+        </small>
+      </span>
+      <span class="arrow">^</span>
+    </button>
+    <div id="open-payables-panel" class="payables-panel" hidden>
+      {% if open_payables %}
+        {{ render_payable_cards(open_payables) }}
+      {% else %}
+        <p class="payables-empty">Nenhuma conta em aberto para o mes selecionado.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card">
+    <button type="button" class="payables-section-toggle" data-toggle-panel="paid-payables-panel" aria-expanded="false">
+      <span class="payables-section-copy">
+        <strong>Contas Pagas</strong>
+        <small>{{ paid_payables|length }} conta{{ "" if paid_payables|length == 1 else "s" }} paga{{ "" if paid_payables|length == 1 else "s" }}</small>
+      </span>
+      <span class="arrow">^</span>
+    </button>
+    <div id="paid-payables-panel" class="payables-panel" hidden>
+      {% if paid_payables %}
+        {{ render_payable_cards(paid_payables) }}
+      {% else %}
+        <p class="payables-empty">Nenhuma conta paga para o mes selecionado.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card subtle-card">
+    <h3>Adicionar Conta a Pagar</h3>
+    <form method="post" class="grid-form payable-form" autocomplete="off">
+      <label for="description">Descricao</label>
+      <input id="description" name="description" required placeholder="Imposto, despesa geral, fornecedor..." />
+
+      <label for="total_amount">Valor total (R$)</label>
+      <input id="total_amount" name="total_amount" type="number" step="0.01" min="0" required />
+
+      <label for="due_date">Vencimento</label>
+      <input id="due_date" name="due_date" type="date" required />
+
+      <label for="notes">Observacao</label>
+      <input id="notes" name="notes" placeholder="Opcional" />
+
+      <div class="store-checkbox-group">
+        <span>Lojas que vao receber o rateio</span>
+        {% for store in stores %}
+          <label class="store-checkbox">
+            <input type="checkbox" name="store_ids" value="{{ store.id }}" />
+            <span>{{ store.name }}</span>
+          </label>
+        {% endfor %}
+      </div>
+
+      <button type="submit">Salvar conta a pagar</button>
+    </form>
+  </section>
+
+  <script>
+    (function () {
+      const toggles = document.querySelectorAll("[data-toggle-panel]");
+      toggles.forEach(function (toggle) {
+        toggle.addEventListener("click", function () {
+          const panel = document.getElementById(toggle.getAttribute("data-toggle-panel"));
+          if (!panel) {
+            return;
+          }
+
+          const willExpand = panel.hasAttribute("hidden");
+          panel.toggleAttribute("hidden");
+          toggle.setAttribute("aria-expanded", String(willExpand));
+        });
+      });
+
+      const buttons = document.querySelectorAll("[data-dialog-id]");
+      const setBodyScroll = function () {
+        const hasOpenDialog = document.querySelector("dialog[open]");
+        document.body.classList.toggle("modal-open", Boolean(hasOpenDialog));
+      };
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          const dialog = document.getElementById(button.getAttribute("data-dialog-id"));
+          if (dialog && typeof dialog.showModal === "function") {
+            dialog.showModal();
+            setBodyScroll();
+          }
+        });
+      });
+
+      const dialogs = document.querySelectorAll("dialog");
+      dialogs.forEach(function (dialog) {
+        dialog.addEventListener("close", setBodyScroll);
+        dialog.addEventListener("cancel", setBodyScroll);
+      });
+    })();
+  </script>
+{% endblock %}

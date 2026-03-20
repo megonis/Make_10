@@ -39,6 +39,18 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+account_payable_stores = db.Table(
+    "account_payable_stores",
+    db.Column("account_payable_id", db.Integer, db.ForeignKey("account_payable.id"), primary_key=True),
+    db.Column("store_id", db.Integer, db.ForeignKey("store.id"), primary_key=True),
+)
+
+cash_outflow_stores = db.Table(
+    "cash_outflow_stores",
+    db.Column("cash_outflow_id", db.Integer, db.ForeignKey("cash_outflow.id"), primary_key=True),
+    db.Column("store_id", db.Integer, db.ForeignKey("store.id"), primary_key=True),
+)
+
 
 class Store(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -50,6 +62,18 @@ class Store(db.Model):
     )
     sales = db.relationship(
         "DailySale", backref="store", lazy=True, cascade="all, delete-orphan"
+    )
+    shared_payables = db.relationship(
+        "AccountPayable",
+        secondary=account_payable_stores,
+        back_populates="stores",
+        lazy="select",
+    )
+    cash_outflows = db.relationship(
+        "CashOutflow",
+        secondary=cash_outflow_stores,
+        back_populates="stores",
+        lazy="select",
     )
 
 
@@ -68,6 +92,40 @@ class DailySale(db.Model):
     sale_date = db.Column(db.Date, nullable=False, index=True)
     amount = db.Column(db.Numeric(12, 2), nullable=False)
     notes = db.Column(db.String(200), nullable=True)
+
+
+class AccountPayable(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(160), nullable=False)
+    total_amount = db.Column(db.Numeric(12, 2), nullable=False)
+    due_date = db.Column(db.Date, nullable=False, index=True)
+    notes = db.Column(db.String(200), nullable=True)
+    is_paid = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.Date, nullable=False, default=date.today)
+
+    stores = db.relationship(
+        "Store",
+        secondary=account_payable_stores,
+        back_populates="shared_payables",
+        lazy="select",
+    )
+
+
+class CashOutflow(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(160), nullable=False)
+    total_amount = db.Column(db.Numeric(12, 2), nullable=False)
+    outflow_date = db.Column(db.Date, nullable=False, index=True)
+    category = db.Column(db.String(80), nullable=True)
+    notes = db.Column(db.String(200), nullable=True)
+    created_at = db.Column(db.Date, nullable=False, default=date.today)
+
+    stores = db.relationship(
+        "Store",
+        secondary=cash_outflow_stores,
+        back_populates="cash_outflows",
+        lazy="select",
+    )
 
 
 def parse_year_month(value: str | None) -> tuple[int, int]:
@@ -112,6 +170,98 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     ).all()
     total_fixed_month = sum((e.monthly_amount for e in expenses), Decimal("0.00"))
 
+    shared_payables = (
+        AccountPayable.query.join(account_payable_stores)
+        .filter(
+            account_payable_stores.c.store_id == store.id,
+            AccountPayable.due_date >= start,
+            AccountPayable.due_date <= end,
+        )
+        .order_by(AccountPayable.due_date.asc(), AccountPayable.id.desc())
+        .all()
+    )
+    shared_payable_rows = []
+    total_shared_month = Decimal("0.00")
+    for payable in shared_payables:
+        store_count = len(payable.stores)
+        allocated_amount = (
+            payable.total_amount / Decimal(store_count) if store_count else Decimal("0.00")
+        )
+        total_shared_month += allocated_amount
+        shared_payable_rows.append(
+            {
+                "id": payable.id,
+                "kind": "payable",
+                "description": payable.description,
+                "event_date": payable.due_date,
+                "total_amount": payable.total_amount,
+                "allocated_amount": allocated_amount,
+                "store_count": store_count,
+                "is_paid": payable.is_paid,
+                "notes": payable.notes,
+                "category": "Conta a pagar",
+            }
+        )
+
+    cash_outflows = (
+        CashOutflow.query.join(cash_outflow_stores)
+        .filter(
+            cash_outflow_stores.c.store_id == store.id,
+            CashOutflow.outflow_date >= start,
+            CashOutflow.outflow_date <= end,
+        )
+        .order_by(CashOutflow.outflow_date.desc(), CashOutflow.id.desc())
+        .all()
+    )
+    cash_outflow_rows = []
+    total_outflows_month = Decimal("0.00")
+    for outflow in cash_outflows:
+        store_count = len(outflow.stores)
+        allocated_amount = (
+            outflow.total_amount / Decimal(store_count) if store_count else Decimal("0.00")
+        )
+        total_outflows_month += allocated_amount
+        cash_outflow_rows.append(
+            {
+                "id": outflow.id,
+                "kind": "outflow",
+                "description": outflow.description,
+                "event_date": outflow.outflow_date,
+                "category": outflow.category,
+                "total_amount": outflow.total_amount,
+                "allocated_amount": allocated_amount,
+                "store_count": store_count,
+                "notes": outflow.notes,
+            }
+        )
+
+    month_expense_items = sorted(
+        [
+            {
+                "kind": item["kind"],
+                "description": item["description"],
+                "event_date": item["event_date"],
+                "allocated_amount": item["allocated_amount"],
+                "status": "Paga" if item.get("is_paid") else "Em aberto",
+                "category": item.get("category") or "Conta a pagar",
+            }
+            for item in shared_payable_rows
+        ]
+        + [
+            {
+                "kind": item["kind"],
+                "description": item["description"],
+                "event_date": item["event_date"],
+                "allocated_amount": item["allocated_amount"],
+                "status": "Pago",
+                "category": item.get("category") or "Saida",
+            }
+            for item in cash_outflow_rows
+        ],
+        key=lambda item: (item["event_date"], item["description"].lower()),
+        reverse=True,
+    )
+
     sales = DailySale.query.filter(
         DailySale.store_id == store.id,
         DailySale.sale_date >= start,
@@ -120,9 +270,8 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     total_sales_month = sum((s.amount for s in sales), Decimal("0.00"))
 
     workdays = workdays_monday_to_saturday(year, month)
-    fixed_per_day = (
-        total_fixed_month / Decimal(len(workdays)) if workdays else Decimal("0.00")
-    )
+    total_expenses_month = total_fixed_month + total_shared_month + total_outflows_month
+    fixed_per_day = total_expenses_month / Decimal(len(workdays)) if workdays else Decimal("0.00")
 
     sales_by_day = defaultdict(lambda: Decimal("0.00"))
     for s in sales:
@@ -142,12 +291,18 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
 
     return {
         "total_fixed_month": total_fixed_month,
+        "total_shared_payables_month": total_shared_month,
+        "total_outflows_month": total_outflows_month,
+        "total_expenses_month": total_expenses_month,
         "total_sales_month": total_sales_month,
         "fixed_per_day": fixed_per_day,
-        "month_result": total_sales_month - total_fixed_month,
+        "month_result": total_sales_month - total_expenses_month,
         "workdays_count": len(workdays),
         "day_rows": day_rows,
         "expenses": expenses,
+        "shared_payables": shared_payable_rows,
+        "cash_outflows": cash_outflow_rows,
+        "month_expense_items": month_expense_items,
     }
 
 
@@ -195,6 +350,11 @@ def index():
 
     total_sales = sum((m["data"]["total_sales_month"] for m in metrics), Decimal("0.00"))
     total_fixed = sum((m["data"]["total_fixed_month"] for m in metrics), Decimal("0.00"))
+    total_shared_payables = sum(
+        (m["data"]["total_shared_payables_month"] for m in metrics), Decimal("0.00")
+    )
+    total_outflows = sum((m["data"]["total_outflows_month"] for m in metrics), Decimal("0.00"))
+    total_expenses = total_fixed + total_shared_payables + total_outflows
 
     return render_template(
         "index.html",
@@ -202,7 +362,10 @@ def index():
         metrics=metrics,
         total_sales=total_sales,
         total_fixed=total_fixed,
-        total_result=total_sales - total_fixed,
+        total_shared_payables=total_shared_payables,
+        total_outflows=total_outflows,
+        total_expenses=total_expenses,
+        total_result=total_sales - total_expenses,
     )
 
 
@@ -226,6 +389,203 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/payables", methods=["GET", "POST"])
+def payables():
+    stores = Store.query.order_by(Store.name).all()
+    if request.method == "POST":
+        description = request.form.get("description", "").strip()
+        total_amount_raw = request.form.get("total_amount", "0")
+        due_date_raw = request.form.get("due_date")
+        notes = request.form.get("notes", "").strip() or None
+        selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
+
+        if not description or not due_date_raw or not selected_store_ids:
+            flash("Preencha descricao, vencimento e selecione ao menos uma loja.", "error")
+            return redirect(url_for("payables"))
+
+        try:
+            due_date_value = datetime.strptime(due_date_raw, "%Y-%m-%d").date()
+            selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
+            if not selected_stores:
+                flash("Nenhuma loja valida foi selecionada.", "error")
+                return redirect(url_for("payables"))
+
+            db.session.add(
+                AccountPayable(
+                    description=description,
+                    total_amount=parse_decimal_input(total_amount_raw),
+                    due_date=due_date_value,
+                    notes=notes,
+                    stores=selected_stores,
+                )
+            )
+            db.session.commit()
+            flash("Conta a pagar cadastrada com sucesso.", "success")
+        except (ArithmeticError, ValueError, SQLAlchemyError):
+            db.session.rollback()
+            app.logger.exception("Erro ao cadastrar conta a pagar.")
+            flash("Nao foi possivel cadastrar a conta a pagar.", "error")
+
+        return redirect(url_for("payables"))
+
+    selected_month = request.args.get("month")
+    year, month = parse_year_month(selected_month)
+    month_token = f"{year:04d}-{month:02d}"
+    start = date(year, month, 1)
+    end = date(year, month, monthrange(year, month)[1])
+    payable_items = (
+        AccountPayable.query.filter(
+            AccountPayable.due_date >= start,
+            AccountPayable.due_date <= end,
+        )
+        .order_by(AccountPayable.due_date.asc(), AccountPayable.id.desc())
+        .all()
+    )
+    return render_template(
+        "payables.html",
+        stores=stores,
+        payables=payable_items,
+        month_token=month_token,
+        today=date.today(),
+    )
+
+
+@app.route("/payables/<int:payable_id>/update", methods=["POST"])
+def update_payable(payable_id: int):
+    payable = AccountPayable.query.get_or_404(payable_id)
+    description = request.form.get("description", "").strip()
+    total_amount_raw = request.form.get("total_amount", "0")
+    due_date_raw = request.form.get("due_date")
+    notes = request.form.get("notes", "").strip() or None
+    selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
+    is_paid = request.form.get("is_paid") == "on"
+
+    if not description or not due_date_raw or not selected_store_ids:
+        flash("Preencha descricao, vencimento e selecione ao menos uma loja.", "error")
+        return redirect(url_for("payables"))
+
+    try:
+        due_date_value = datetime.strptime(due_date_raw, "%Y-%m-%d").date()
+        selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
+        if not selected_stores:
+            flash("Nenhuma loja valida foi selecionada.", "error")
+            return redirect(url_for("payables"))
+
+        payable.description = description
+        payable.total_amount = parse_decimal_input(total_amount_raw)
+        payable.due_date = due_date_value
+        payable.notes = notes
+        payable.is_paid = is_paid
+        payable.stores = selected_stores
+        db.session.commit()
+        flash("Conta a pagar atualizada com sucesso.", "success")
+    except (ArithmeticError, ValueError, SQLAlchemyError):
+        db.session.rollback()
+        app.logger.exception("Erro ao atualizar conta a pagar.")
+        flash("Nao foi possivel atualizar a conta a pagar.", "error")
+
+    return redirect(url_for("payables"))
+
+
+@app.route("/outflows", methods=["GET", "POST"])
+def outflows():
+    stores = Store.query.order_by(Store.name).all()
+    if request.method == "POST":
+        description = request.form.get("description", "").strip()
+        total_amount_raw = request.form.get("total_amount", "0")
+        outflow_date_raw = request.form.get("outflow_date")
+        category = request.form.get("category", "").strip() or None
+        notes = request.form.get("notes", "").strip() or None
+        selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
+
+        if not description or not outflow_date_raw or not selected_store_ids:
+            flash("Preencha descricao, data e selecione ao menos uma loja.", "error")
+            return redirect(url_for("outflows"))
+
+        try:
+            outflow_date_value = datetime.strptime(outflow_date_raw, "%Y-%m-%d").date()
+            selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
+            if not selected_stores:
+                flash("Nenhuma loja valida foi selecionada.", "error")
+                return redirect(url_for("outflows"))
+
+            db.session.add(
+                CashOutflow(
+                    description=description,
+                    total_amount=parse_decimal_input(total_amount_raw),
+                    outflow_date=outflow_date_value,
+                    category=category,
+                    notes=notes,
+                    stores=selected_stores,
+                )
+            )
+            db.session.commit()
+            flash("Saida cadastrada com sucesso.", "success")
+        except (ArithmeticError, ValueError, SQLAlchemyError):
+            db.session.rollback()
+            app.logger.exception("Erro ao cadastrar saida.")
+            flash("Nao foi possivel cadastrar a saida.", "error")
+
+        return redirect(url_for("outflows"))
+
+    selected_month = request.args.get("month")
+    year, month = parse_year_month(selected_month)
+    month_token = f"{year:04d}-{month:02d}"
+    start = date(year, month, 1)
+    end = date(year, month, monthrange(year, month)[1])
+    outflow_items = (
+        CashOutflow.query.filter(
+            CashOutflow.outflow_date >= start,
+            CashOutflow.outflow_date <= end,
+        )
+        .order_by(CashOutflow.outflow_date.desc(), CashOutflow.id.desc())
+        .all()
+    )
+    return render_template(
+        "outflows.html",
+        stores=stores,
+        outflows=outflow_items,
+        month_token=month_token,
+    )
+
+
+@app.route("/outflows/<int:outflow_id>/update", methods=["POST"])
+def update_outflow(outflow_id: int):
+    outflow = CashOutflow.query.get_or_404(outflow_id)
+    description = request.form.get("description", "").strip()
+    total_amount_raw = request.form.get("total_amount", "0")
+    outflow_date_raw = request.form.get("outflow_date")
+    category = request.form.get("category", "").strip() or None
+    notes = request.form.get("notes", "").strip() or None
+    selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
+
+    if not description or not outflow_date_raw or not selected_store_ids:
+        flash("Preencha descricao, data e selecione ao menos uma loja.", "error")
+        return redirect(url_for("outflows"))
+
+    try:
+        outflow_date_value = datetime.strptime(outflow_date_raw, "%Y-%m-%d").date()
+        selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
+        if not selected_stores:
+            flash("Nenhuma loja valida foi selecionada.", "error")
+            return redirect(url_for("outflows"))
+
+        outflow.description = description
+        outflow.total_amount = parse_decimal_input(total_amount_raw)
+        outflow.outflow_date = outflow_date_value
+        outflow.category = category
+        outflow.notes = notes
+        outflow.stores = selected_stores
+        db.session.commit()
+        flash("Saida atualizada com sucesso.", "success")
+    except (ArithmeticError, ValueError, SQLAlchemyError):
+        db.session.rollback()
+        app.logger.exception("Erro ao atualizar saida.")
+        flash("Nao foi possivel atualizar a saida.", "error")
+
+    return redirect(url_for("outflows"))
 
 
 @app.route("/stores", methods=["GET", "POST"])

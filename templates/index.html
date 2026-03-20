@@ -17,6 +17,14 @@
         <strong>{{ money(total_fixed) }}</strong>
       </article>
       <article class="kpi">
+        <small>Saidas</small>
+        <strong>{{ money(total_outflows) }}</strong>
+      </article>
+      <article class="kpi">
+        <small>Total de despesas</small>
+        <strong>{{ money(total_expenses) }}</strong>
+      </article>
+      <article class="kpi">
         <small>Resultado do mês</small>
         <strong>{{ money(total_result) }}</strong>
       </article>
@@ -32,6 +40,8 @@
             <th>Loja</th>
             <th>Vendas no mês</th>
             <th>Despesas fixas</th>
+            <th>Saidas</th>
+            <th>Total despesas</th>
             <th>Custo fixo por dia</th>
             <th>Resultado</th>
           </tr>
@@ -48,6 +58,8 @@
               <td data-label="Loja" class="store-name-cell">{{ item.store.name }}</td>
               <td data-label="Vendas no mês">{{ money(item.data.total_sales_month) }}</td>
               <td data-label="Despesas fixas">{{ money(item.data.total_fixed_month) }}</td>
+              <td data-label="Saidas">{{ money(item.data.total_outflows_month) }}</td>
+              <td data-label="Total despesas">{{ money(item.data.total_expenses_month) }}</td>
               <td data-label="Custo fixo por dia">{{ money(item.data.fixed_per_day) }}</td>
               <td data-label="Resultado">{{ money(item.data.month_result) }}</td>
             </tr>
