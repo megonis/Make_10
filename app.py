@@ -4,9 +4,10 @@ from calendar import monthrange
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 import os
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, make_response, redirect, render_template, request, session, url_for
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
@@ -278,6 +279,147 @@ def entry_category_label(value: str | None) -> str:
     return ENTRY_CATEGORY_CHOICES.get(normalized, ENTRY_CATEGORY_CHOICES["outros"])
 
 
+def pdf_escape(text: str) -> str:
+    return (
+        text.replace("\\", "\\\\")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+        .replace("\r", " ")
+        .replace("\n", " ")
+    )
+
+
+def build_simple_pdf(lines_by_page: list[list[str]]) -> bytes:
+    objects: list[bytes] = []
+
+    def add_object(data: str | bytes) -> int:
+        if isinstance(data, str):
+            data = data.encode("latin-1", errors="replace")
+        objects.append(data)
+        return len(objects)
+
+    font_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    bold_font_id = add_object("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
+
+    page_ids: list[int] = []
+    content_ids: list[int] = []
+    pages_id_placeholder_index = len(objects)
+    add_object("<< /Type /Pages /Kids [] /Count 0 >>")
+
+    for page_lines in lines_by_page:
+        content_lines = [
+            "BT",
+            "/F2 16 Tf",
+            "50 805 Td",
+            f"({pdf_escape(page_lines[0])}) Tj",
+            "0 -24 Td",
+            "/F1 10 Tf",
+        ]
+        for line in page_lines[1:]:
+            content_lines.append(f"({pdf_escape(line)}) Tj")
+            content_lines.append("0 -14 Td")
+        content_lines.append("ET")
+        stream = "\n".join(content_lines)
+        content_id = add_object(
+            f"<< /Length {len(stream.encode('latin-1', errors='replace'))} >>\nstream\n{stream}\nendstream"
+        )
+        content_ids.append(content_id)
+        page_id = add_object(
+            f"<< /Type /Page /Parent {pages_id_placeholder_index + 1} 0 R /MediaBox [0 0 595 842] "
+            f"/Resources << /Font << /F1 {font_id} 0 R /F2 {bold_font_id} 0 R >> >> "
+            f"/Contents {content_id} 0 R >>"
+        )
+        page_ids.append(page_id)
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+    objects[pages_id_placeholder_index] = (
+        f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>".encode("latin-1")
+    )
+    catalog_id = add_object(f"<< /Type /Catalog /Pages {pages_id_placeholder_index + 1} 0 R >>")
+
+    buffer = BytesIO()
+    buffer.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(buffer.tell())
+        buffer.write(f"{index} 0 obj\n".encode("latin-1"))
+        buffer.write(obj)
+        buffer.write(b"\nendobj\n")
+
+    xref_start = buffer.tell()
+    buffer.write(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
+    buffer.write(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        buffer.write(f"{offset:010d} 00000 n \n".encode("latin-1"))
+    buffer.write(
+        f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\nstartxref\n{xref_start}\n%%EOF".encode(
+            "latin-1"
+        )
+    )
+    return buffer.getvalue()
+
+
+def build_summary_context() -> dict:
+    selected_start, selected_end, month_token = resolve_period_filters(
+        request.args.get("date_from"), request.args.get("date_to")
+    )
+
+    stores = Store.query.order_by(Store.name).all()
+    selected_store_ids, filtered_stores = resolve_selected_stores(
+        stores, request.args.getlist("store_ids")
+    )
+
+    metrics = []
+    for store in filtered_stores:
+        data = period_store_metrics(store, selected_start, selected_end)
+        metrics.append({"store": store, "data": data})
+
+    total_sales = sum((m["data"]["total_sales_month"] for m in metrics), Decimal("0.00"))
+    total_shared_payables = sum(
+        (m["data"]["total_shared_payables_month"] for m in metrics), Decimal("0.00")
+    )
+    total_outflows = sum((m["data"]["total_outflows_month"] for m in metrics), Decimal("0.00"))
+    total_operational_outflows = sum(
+        (m["data"]["total_operational_outflows_month"] for m in metrics), Decimal("0.00")
+    )
+    total_paid_payables = sum(
+        (m["data"]["total_paid_payables_month"] for m in metrics), Decimal("0.00")
+    )
+    total_personal = sum((m["data"]["total_personal_month"] for m in metrics), Decimal("0.00"))
+    total_merchandise = sum(
+        (m["data"]["total_merchandise_month"] for m in metrics), Decimal("0.00")
+    )
+    total_expense_bucket = total_paid_payables - total_personal + total_operational_outflows
+    total_expenses = total_shared_payables + total_outflows
+
+    selected_store_names = [store.name for store in filtered_stores]
+    selected_store_label = (
+        "Todas as lojas" if not selected_store_ids else ", ".join(selected_store_names)
+    )
+
+    return {
+        "month_token": month_token,
+        "date_from_value": selected_start.strftime("%Y-%m-%d"),
+        "date_to_value": selected_end.strftime("%Y-%m-%d"),
+        "selected_start": selected_start,
+        "selected_end": selected_end,
+        "stores": stores,
+        "selected_store_ids": selected_store_ids,
+        "selected_store_label": selected_store_label,
+        "metrics": metrics,
+        "total_sales": total_sales,
+        "total_shared_payables": total_shared_payables,
+        "total_outflows": total_outflows,
+        "total_operational_outflows": total_operational_outflows,
+        "total_paid_payables": total_paid_payables,
+        "total_personal": total_personal,
+        "total_expense_bucket": total_expense_bucket,
+        "total_merchandise": total_merchandise,
+        "total_expenses": total_expenses,
+        "total_result": total_sales - total_expenses,
+    }
+
+
 def period_store_metrics(store: Store, start: date, end: date) -> dict:
     shared_payables = (
         AccountPayable.query.join(account_payable_stores)
@@ -416,7 +558,6 @@ def period_store_metrics(store: Store, start: date, end: date) -> dict:
     ).all()
     total_sales_month = sum((s.amount for s in sales), Decimal("0.00"))
 
-    workdays = workdays_between(start, end)
     total_personal_month = total_personal_payables_month + total_personal_outflows_month
     total_expense_bucket_month = (
         total_paid_payables_month
@@ -425,14 +566,18 @@ def period_store_metrics(store: Store, start: date, end: date) -> dict:
         + total_operational_outflows_month
     )
     total_expenses_month = total_shared_month + total_outflows_month
-    expense_per_day = total_expenses_month / Decimal(len(workdays)) if workdays else Decimal("0.00")
 
     sales_by_day = defaultdict(lambda: Decimal("0.00"))
     for s in sales:
         sales_by_day[s.sale_date] += s.amount
 
+    worked_days = sorted(sales_by_day.keys())
+    expense_per_day = (
+        total_expenses_month / Decimal(len(worked_days)) if worked_days else Decimal("0.00")
+    )
+
     day_rows = []
-    for d in workdays:
+    for d in worked_days:
         sales_value = sales_by_day[d]
         day_rows.append(
             {
@@ -458,7 +603,7 @@ def period_store_metrics(store: Store, start: date, end: date) -> dict:
         "total_sales_month": total_sales_month,
         "expense_per_day": expense_per_day,
         "month_result": total_sales_month - total_expenses_month,
-        "workdays_count": len(workdays),
+        "workdays_count": len(worked_days),
         "day_rows": day_rows,
         "shared_payables": shared_payable_rows,
         "open_shared_payables": [item for item in shared_payable_rows if not item.get("is_paid")],
@@ -510,57 +655,52 @@ def disable_cache_in_debug(response):
 
 @app.route("/")
 def index():
-    start_raw = request.args.get("date_from")
-    end_raw = request.args.get("date_to")
-    selected_start, selected_end, month_token = resolve_period_filters(start_raw, end_raw)
+    return render_template("index.html", **build_summary_context())
 
-    stores = Store.query.order_by(Store.name).all()
-    selected_store_ids, filtered_stores = resolve_selected_stores(
-        stores, request.args.getlist("store_ids")
-    )
 
-    metrics = []
-    for store in filtered_stores:
-        data = period_store_metrics(store, selected_start, selected_end)
-        metrics.append({"store": store, "data": data})
+@app.route("/summary/pdf")
+def summary_pdf():
+    context = build_summary_context()
+    lines = [
+        "Resumo Geral",
+        f"Periodo: {context['selected_start'].strftime('%d/%m/%Y')} ate {context['selected_end'].strftime('%d/%m/%Y')}",
+        f"Lojas: {context['selected_store_label']}",
+        "",
+        f"Vendas totais: {money(context['total_sales'])}",
+        f"Despesas: {money(context['total_expense_bucket'])}",
+        f"Despesas pessoais: {money(context['total_personal'])}",
+        f"Mercadoria no mes: {money(context['total_merchandise'])}",
+        f"Total de despesas: {money(context['total_expenses'])}",
+        f"Resultado do mes: {money(context['total_result'])}",
+        "",
+        "Resumo por loja",
+    ]
 
-    total_sales = sum((m["data"]["total_sales_month"] for m in metrics), Decimal("0.00"))
-    total_shared_payables = sum(
-        (m["data"]["total_shared_payables_month"] for m in metrics), Decimal("0.00")
-    )
-    total_outflows = sum((m["data"]["total_outflows_month"] for m in metrics), Decimal("0.00"))
-    total_operational_outflows = sum(
-        (m["data"]["total_operational_outflows_month"] for m in metrics), Decimal("0.00")
-    )
-    total_paid_payables = sum(
-        (m["data"]["total_paid_payables_month"] for m in metrics), Decimal("0.00")
-    )
-    total_personal = sum((m["data"]["total_personal_month"] for m in metrics), Decimal("0.00"))
-    total_merchandise = sum(
-        (m["data"]["total_merchandise_month"] for m in metrics), Decimal("0.00")
-    )
-    total_expense_bucket = total_paid_payables - total_personal + total_operational_outflows
-    total_expenses = total_shared_payables + total_outflows
+    for item in context["metrics"]:
+        lines.extend(
+            [
+                f"- {item['store'].name}",
+                f"  Vendas: {money(item['data']['total_sales_month'])}",
+                f"  Despesas: {money(item['data']['total_expense_bucket_month'])}",
+                f"  Despesas pessoais: {money(item['data']['total_personal_month'])}",
+                f"  Mercadoria: {money(item['data']['total_merchandise_month'])}",
+                f"  Total despesas: {money(item['data']['total_expenses_month'])}",
+                f"  Despesa media por dia: {money(item['data']['expense_per_day'])}",
+                f"  Resultado: {money(item['data']['month_result'])}",
+                "",
+            ]
+        )
 
-    return render_template(
-        "index.html",
-        month_token=month_token,
-        date_from_value=selected_start.strftime("%Y-%m-%d"),
-        date_to_value=selected_end.strftime("%Y-%m-%d"),
-        stores=stores,
-        selected_store_ids=selected_store_ids,
-        metrics=metrics,
-        total_sales=total_sales,
-        total_shared_payables=total_shared_payables,
-        total_outflows=total_outflows,
-        total_operational_outflows=total_operational_outflows,
-        total_paid_payables=total_paid_payables,
-        total_personal=total_personal,
-        total_expense_bucket=total_expense_bucket,
-        total_merchandise=total_merchandise,
-        total_expenses=total_expenses,
-        total_result=total_sales - total_expenses,
+    page_size = 46
+    pages = [lines[index:index + page_size] for index in range(0, len(lines), page_size)] or [["Resumo Geral"]]
+    pdf_bytes = build_simple_pdf(pages)
+
+    response = make_response(pdf_bytes)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = (
+        f"inline; filename=resumo-{context['date_from_value']}-{context['date_to_value']}.pdf"
     )
+    return response
 
 
 @app.route("/login", methods=["GET", "POST"])

@@ -55,6 +55,14 @@
         </details>
       </div>
       <button type="submit" class="summary-filter-button">Atualizar</button>
+      <button
+        type="submit"
+        class="summary-filter-button secondary-button"
+        formaction="{{ url_for('summary_pdf') }}"
+        formtarget="_blank"
+      >
+        Gerar PDF
+      </button>
     </form>
     <!-- Grade responsiva dos indicadores financeiros gerais. -->
     <div class="kpi-grid summary-kpi-grid">
