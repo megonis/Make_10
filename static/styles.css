@@ -213,6 +213,81 @@ body.modal-open {
   background: rgba(16, 31, 54, 0.9);
 }
 
+.store-assignment-group {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.store-assignment-group > span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding-left: 2px;
+}
+
+.store-assignment-group .store-filter-dropdown {
+  position: relative;
+}
+
+.store-assignment-group .store-filter-summary {
+  min-height: 46px;
+}
+
+.store-assignment-group .store-filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 35;
+  margin-top: 0;
+  box-shadow: 0 18px 40px rgba(2, 8, 23, 0.4);
+  background: rgba(8, 20, 35, 0.98);
+}
+
+.compact-entry-form .store-assignment-group {
+  grid-area: stores;
+  grid-column: 4;
+  grid-row: 1 / span 2;
+  max-width: 260px;
+  width: 100%;
+  justify-self: stretch;
+}
+
+.compact-entry-form button[type="submit"] {
+  grid-area: submit;
+  grid-column: 1 / span 2;
+  justify-self: start;
+  width: fit-content;
+  min-width: 220px;
+}
+
+.compact-entry-form .store-filter-options {
+  max-height: 260px;
+}
+
+@media (max-width: 1100px) {
+  .compact-entry-form {
+    grid-template-columns: repeat(2, minmax(220px, 360px));
+    grid-template-areas:
+      "stores stores"
+      "description total"
+      "date type"
+      "category notes"
+      "submit submit";
+  }
+
+  .compact-entry-form .store-assignment-group {
+    max-width: 520px;
+  }
+
+  .compact-entry-form button[type="submit"] {
+    min-width: 220px;
+  }
+}
+
 .store-checkbox {
   display: flex;
   align-items: center;
@@ -360,9 +435,78 @@ body.modal-open {
   align-items: end;
 }
 
+.compact-entry-form {
+  grid-template-columns: minmax(240px, 1.35fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 0.95fr);
+  justify-content: start;
+  align-items: start;
+  gap: 14px 16px;
+  grid-template-areas:
+    "description total date stores"
+    "type category notes stores"
+    "submit submit . .";
+}
+
+.entry-form-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.entry-form-field span {
+  display: block;
+}
+
+.entry-form-field input,
+.entry-form-field select {
+  min-height: 44px;
+  width: 100%;
+}
+
+.entry-field-description {
+  grid-area: description;
+}
+
+.entry-field-total {
+  grid-area: total;
+}
+
+.entry-field-date {
+  grid-area: date;
+}
+
+.entry-field-type {
+  grid-area: type;
+}
+
+.entry-field-category {
+  grid-area: category;
+}
+
+.entry-field-notes {
+  grid-area: notes;
+}
+
+.entry-field-extra {
+  grid-area: notes;
+}
+
 .payable-form .store-checkbox-group,
 .payable-form button {
   grid-column: 1 / -1;
+}
+
+.compact-entry-form.payable-form .store-assignment-group {
+  grid-area: stores;
+  grid-column: 4;
+  grid-row: 1 / span 2;
+}
+
+.compact-entry-form.payable-form button[type="submit"] {
+  grid-area: submit;
+  grid-column: 1 / span 2;
 }
 
 .payables-grid {

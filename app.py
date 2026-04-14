@@ -181,6 +181,49 @@ def parse_date_input(value: str | None) -> date | None:
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def resolve_period_filters(
+    start_raw: str | None, end_raw: str | None, reference_month: str | None = None
+) -> tuple[date, date, str]:
+    year, month = parse_year_month(reference_month)
+    default_start = date(year, month, 1)
+    default_end = date(year, month, monthrange(year, month)[1])
+
+    try:
+        selected_start = parse_date_input(start_raw) or default_start
+        selected_end = parse_date_input(end_raw) or default_end
+    except ValueError:
+        selected_start = default_start
+        selected_end = default_end
+
+    if selected_start > selected_end:
+        selected_start = default_start
+        selected_end = default_end
+
+    month_token = f"{selected_start.year:04d}-{selected_start.month:02d}"
+    return selected_start, selected_end, month_token
+
+
+def resolve_selected_stores(
+    all_stores: list[Store], selected_values: list[str]
+) -> tuple[list[int], list[Store]]:
+    available_store_ids = {store.id for store in all_stores}
+    selected_store_ids: list[int] = []
+    for raw_value in selected_values:
+        try:
+            store_id = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if store_id in available_store_ids and store_id not in selected_store_ids:
+            selected_store_ids.append(store_id)
+
+    if not selected_store_ids:
+        return [], all_stores
+
+    selected_store_set = set(selected_store_ids)
+    filtered_stores = [store for store in all_stores if store.id in selected_store_set]
+    return selected_store_ids, filtered_stores
+
+
 def month_days(year: int, month: int) -> list[date]:
     total_days = monthrange(year, month)[1]
     return [date(year, month, day) for day in range(1, total_days + 1)]
@@ -467,45 +510,14 @@ def disable_cache_in_debug(response):
 
 @app.route("/")
 def index():
-    selected_month = request.args.get("month")
     start_raw = request.args.get("date_from")
     end_raw = request.args.get("date_to")
-
-    year, month = parse_year_month(selected_month)
-    default_start = date(year, month, 1)
-    default_end = date(year, month, monthrange(year, month)[1])
-
-    try:
-        selected_start = parse_date_input(start_raw) or default_start
-        selected_end = parse_date_input(end_raw) or default_end
-    except ValueError:
-        flash("Periodo invalido. Usando o mes selecionado.", "error")
-        selected_start = default_start
-        selected_end = default_end
-
-    if selected_start > selected_end:
-        flash("A data inicial precisa ser menor ou igual a data final.", "error")
-        selected_start = default_start
-        selected_end = default_end
-
-    month_token = f"{year:04d}-{month:02d}"
+    selected_start, selected_end, month_token = resolve_period_filters(start_raw, end_raw)
 
     stores = Store.query.order_by(Store.name).all()
-    available_store_ids = {store.id for store in stores}
-    selected_store_ids = []
-    for raw_value in request.args.getlist("store_ids"):
-        try:
-            store_id = int(raw_value)
-        except (TypeError, ValueError):
-            continue
-        if store_id in available_store_ids and store_id not in selected_store_ids:
-            selected_store_ids.append(store_id)
-
-    selected_store_set = set(selected_store_ids)
-    if selected_store_ids:
-        filtered_stores = [store for store in stores if store.id in selected_store_set]
-    else:
-        filtered_stores = stores
+    selected_store_ids, filtered_stores = resolve_selected_stores(
+        stores, request.args.getlist("store_ids")
+    )
 
     metrics = []
     for store in filtered_stores:
@@ -616,24 +628,29 @@ def payables():
 
         return redirect(url_for("payables"))
 
-    selected_month = request.args.get("month")
-    year, month = parse_year_month(selected_month)
-    month_token = f"{year:04d}-{month:02d}"
-    start = date(year, month, 1)
-    end = date(year, month, monthrange(year, month)[1])
-    payable_items = (
-        AccountPayable.query.filter(
-            AccountPayable.due_date >= start,
-            AccountPayable.due_date <= end,
-        )
-        .order_by(AccountPayable.due_date.asc(), AccountPayable.id.desc())
-        .all()
+    selected_start, selected_end, month_token = resolve_period_filters(
+        request.args.get("date_from"), request.args.get("date_to")
     )
+    selected_store_ids, _ = resolve_selected_stores(stores, request.args.getlist("store_ids"))
+    payable_query = AccountPayable.query.filter(
+        AccountPayable.due_date >= selected_start,
+        AccountPayable.due_date <= selected_end,
+    )
+    if selected_store_ids:
+        payable_query = (
+            payable_query.join(account_payable_stores)
+            .filter(account_payable_stores.c.store_id.in_(selected_store_ids))
+            .distinct()
+        )
+    payable_items = payable_query.order_by(AccountPayable.due_date.asc(), AccountPayable.id.desc()).all()
     return render_template(
         "payables.html",
         stores=stores,
         payables=payable_items,
         month_token=month_token,
+        date_from_value=selected_start.strftime("%Y-%m-%d"),
+        date_to_value=selected_end.strftime("%Y-%m-%d"),
+        selected_store_ids=selected_store_ids,
         today=date.today(),
         entry_type_choices=ENTRY_TYPE_CHOICES,
         entry_category_choices=ENTRY_CATEGORY_CHOICES,
@@ -744,24 +761,29 @@ def outflows():
 
         return redirect(url_for("outflows"))
 
-    selected_month = request.args.get("month")
-    year, month = parse_year_month(selected_month)
-    month_token = f"{year:04d}-{month:02d}"
-    start = date(year, month, 1)
-    end = date(year, month, monthrange(year, month)[1])
-    outflow_items = (
-        CashOutflow.query.filter(
-            CashOutflow.outflow_date >= start,
-            CashOutflow.outflow_date <= end,
-        )
-        .order_by(CashOutflow.outflow_date.desc(), CashOutflow.id.desc())
-        .all()
+    selected_start, selected_end, month_token = resolve_period_filters(
+        request.args.get("date_from"), request.args.get("date_to")
     )
+    selected_store_ids, _ = resolve_selected_stores(stores, request.args.getlist("store_ids"))
+    outflow_query = CashOutflow.query.filter(
+        CashOutflow.outflow_date >= selected_start,
+        CashOutflow.outflow_date <= selected_end,
+    )
+    if selected_store_ids:
+        outflow_query = (
+            outflow_query.join(cash_outflow_stores)
+            .filter(cash_outflow_stores.c.store_id.in_(selected_store_ids))
+            .distinct()
+        )
+    outflow_items = outflow_query.order_by(CashOutflow.outflow_date.desc(), CashOutflow.id.desc()).all()
     return render_template(
         "outflows.html",
         stores=stores,
         outflows=outflow_items,
         month_token=month_token,
+        date_from_value=selected_start.strftime("%Y-%m-%d"),
+        date_to_value=selected_end.strftime("%Y-%m-%d"),
+        selected_store_ids=selected_store_ids,
         entry_type_choices=ENTRY_TYPE_CHOICES,
         entry_category_choices=ENTRY_CATEGORY_CHOICES,
     )

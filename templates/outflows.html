@@ -3,10 +3,47 @@
   <!-- Filtro do mês que controla a listagem e os formulários da tela de saídas. -->
   <section class="card">
     <h2>Saidas</h2>
-    <form method="get" class="inline-form" autocomplete="off">
-      <label for="month">Mes de analise</label>
-      <input id="month" name="month" type="month" value="{{ month_token }}" />
-      <button type="submit">Atualizar</button>
+    <form method="get" class="summary-filter-form" autocomplete="off">
+      <label for="date_from" class="summary-filter-field">
+        <span>Data inicial</span>
+        <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
+      </label>
+      <label for="date_to" class="summary-filter-field">
+        <span>Data final</span>
+        <input id="date_to" name="date_to" type="date" value="{{ date_to_value }}" />
+      </label>
+      <div class="summary-filter-field summary-store-filter">
+        <span>Lojas na tela</span>
+        <details class="store-filter-dropdown">
+          <summary class="store-filter-summary">
+            <span class="store-filter-summary-label">
+              {% if not selected_store_ids %}
+                Todas as lojas
+              {% elif selected_store_ids|length == 1 %}
+                1 loja selecionada
+              {% else %}
+                {{ selected_store_ids|length }} lojas selecionadas
+              {% endif %}
+            </span>
+            <span class="store-filter-summary-icon">▾</span>
+          </summary>
+          <div class="store-filter-panel">
+            <label class="store-filter-option store-filter-option-all">
+              <input type="checkbox" class="store-filter-all" {% if not selected_store_ids %}checked{% endif %} />
+              <span>Todas as lojas</span>
+            </label>
+            <div class="store-filter-options">
+              {% for store in stores %}
+                <label class="store-filter-option">
+                  <input type="checkbox" name="store_ids" value="{{ store.id }}" {% if store.id in selected_store_ids %}checked{% endif %} />
+                  <span>{{ store.name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      </div>
+      <button type="submit" class="summary-filter-button">Atualizar</button>
     </form>
   </section>
 
@@ -97,25 +134,44 @@
                   {% endfor %}
                 </select>
 
-                <label for="category-{{ outflow.id }}">Complemento da categoria</label>
-                <input id="category-{{ outflow.id }}" name="category" value="{{ outflow.category or '' }}" placeholder="Opcional: limpeza pesada, fornecedor X..." />
-
                 <label for="notes-{{ outflow.id }}">Observacao</label>
                 <input id="notes-{{ outflow.id }}" name="notes" value="{{ outflow.notes or '' }}" />
 
-                <div class="store-checkbox-group">
+                <div class="store-checkbox-group store-assignment-group">
                   <span>Lojas que vao receber os valores</span>
-                  {% for store in stores %}
-                    <label class="store-checkbox">
-                      <input
-                        type="checkbox"
-                        name="store_ids"
-                        value="{{ store.id }}"
-                        {% if store in outflow.stores %}checked{% endif %}
-                      />
-                      <span>{{ store.name }}</span>
-                    </label>
-                  {% endfor %}
+                  <details class="store-filter-dropdown store-assignment-dropdown">
+                    <summary class="store-filter-summary">
+                      <span class="store-filter-summary-label">
+                        {% if outflow.stores|length == stores|length %}
+                          Todas as lojas
+                        {% elif outflow.stores|length == 1 %}
+                          1 loja selecionada
+                        {% else %}
+                          {{ outflow.stores|length }} lojas selecionadas
+                        {% endif %}
+                      </span>
+                      <span class="store-filter-summary-icon">▾</span>
+                    </summary>
+                    <div class="store-filter-panel">
+                      <label class="store-filter-option store-filter-option-all">
+                        <input type="checkbox" class="store-filter-all" {% if outflow.stores|length == stores|length %}checked{% endif %} />
+                        <span>Todas as lojas</span>
+                      </label>
+                      <div class="store-filter-options">
+                        {% for store in stores %}
+                          <label class="store-filter-option">
+                            <input
+                              type="checkbox"
+                              name="store_ids"
+                              value="{{ store.id }}"
+                              {% if store in outflow.stores %}checked{% endif %}
+                            />
+                            <span>{{ store.name }}</span>
+                          </label>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </details>
                 </div>
 
                 <button type="submit">Salvar alteracoes</button>
@@ -136,44 +192,67 @@
   <!-- Formulário de cadastro de nova saída compartilhada entre lojas. -->
   <section class="card subtle-card">
     <h3>Adicionar Saida</h3>
-    <form method="post" class="grid-form payable-form" autocomplete="off">
-      <label for="description">Descricao</label>
-      <input id="description" name="description" required placeholder="Material de limpeza, manutencao, frete..." />
+    <form method="post" class="grid-form payable-form compact-entry-form" autocomplete="off">
+      <label for="description" class="entry-form-field entry-field-description">
+        <span>Descricao</span>
+        <input id="description" name="description" required placeholder="Material de limpeza, manutencao, frete..." />
+      </label>
 
-      <label for="total_amount">Valor total (R$)</label>
-      <input id="total_amount" name="total_amount" type="number" step="0.01" min="0" required />
+      <label for="total_amount" class="entry-form-field entry-field-total">
+        <span>Valor total (R$)</span>
+        <input id="total_amount" name="total_amount" type="number" step="0.01" min="0" required />
+      </label>
 
-      <label for="outflow_date">Data da saida</label>
-      <input id="outflow_date" name="outflow_date" type="date" required />
+      <label for="outflow_date" class="entry-form-field entry-field-date">
+        <span>Data da saida</span>
+        <input id="outflow_date" name="outflow_date" type="date" required />
+      </label>
 
-      <label for="outflow_type">Tipo da saida</label>
-      <select id="outflow_type" name="outflow_type" required>
-        {% for option_value, option_label in entry_type_choices.items() %}
-          <option value="{{ option_value }}">{{ option_label }}</option>
-        {% endfor %}
-      </select>
+      <label for="outflow_type" class="entry-form-field entry-field-type">
+        <span>Tipo da saida</span>
+        <select id="outflow_type" name="outflow_type" required>
+          {% for option_value, option_label in entry_type_choices.items() %}
+            <option value="{{ option_value }}">{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
 
-      <label for="category_code">Categoria</label>
-      <select id="category_code" name="category_code" required>
-        {% for option_value, option_label in entry_category_choices.items() %}
-          <option value="{{ option_value }}">{{ option_label }}</option>
-        {% endfor %}
-      </select>
+      <label for="category_code" class="entry-form-field entry-field-category">
+        <span>Categoria</span>
+        <select id="category_code" name="category_code" required>
+          {% for option_value, option_label in entry_category_choices.items() %}
+            <option value="{{ option_value }}">{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
 
-      <label for="category">Complemento da categoria</label>
-      <input id="category" name="category" placeholder="Opcional" />
+      <label for="notes" class="entry-form-field entry-field-notes">
+        <span>Observacao</span>
+        <input id="notes" name="notes" placeholder="Opcional" />
+      </label>
 
-      <label for="notes">Observacao</label>
-      <input id="notes" name="notes" placeholder="Opcional" />
-
-      <div class="store-checkbox-group">
+      <div class="store-checkbox-group store-assignment-group">
         <span>Lojas que vao receber os valores</span>
-        {% for store in stores %}
-          <label class="store-checkbox">
-            <input type="checkbox" name="store_ids" value="{{ store.id }}" />
-            <span>{{ store.name }}</span>
-          </label>
-        {% endfor %}
+        <details class="store-filter-dropdown store-assignment-dropdown">
+          <summary class="store-filter-summary">
+            <span class="store-filter-summary-label">Selecione as lojas</span>
+            <span class="store-filter-summary-icon">▾</span>
+          </summary>
+          <div class="store-filter-panel">
+            <label class="store-filter-option store-filter-option-all">
+              <input type="checkbox" class="store-filter-all" />
+              <span>Todas as lojas</span>
+            </label>
+            <div class="store-filter-options">
+              {% for store in stores %}
+                <label class="store-filter-option">
+                  <input type="checkbox" name="store_ids" value="{{ store.id }}" />
+                  <span>{{ store.name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
       </div>
 
       <button type="submit">Salvar saida</button>
@@ -182,10 +261,133 @@
 
   <script>
     (function () {
+      const filterDropdown = document.querySelector(".summary-store-filter .store-filter-dropdown");
+      if (filterDropdown) {
+        const allToggle = filterDropdown.querySelector(".store-filter-all");
+        const storeCheckboxes = Array.from(filterDropdown.querySelectorAll('input[name="store_ids"]'));
+        const summaryLabel = filterDropdown.querySelector(".store-filter-summary-label");
+
+        const syncSummary = function () {
+          const checkedCount = storeCheckboxes.filter(function (checkbox) {
+            return checkbox.checked;
+          }).length;
+
+          if (!summaryLabel) {
+            return;
+          }
+
+          if (checkedCount === 0 || checkedCount === storeCheckboxes.length) {
+            summaryLabel.textContent = "Todas as lojas";
+          } else if (checkedCount === 1) {
+            summaryLabel.textContent = "1 loja selecionada";
+          } else {
+            summaryLabel.textContent = checkedCount + " lojas selecionadas";
+          }
+        };
+
+        const syncAllToggle = function () {
+          if (!allToggle) {
+            return;
+          }
+
+          const checkedCount = storeCheckboxes.filter(function (checkbox) {
+            return checkbox.checked;
+          }).length;
+          allToggle.checked = checkedCount === 0 || checkedCount === storeCheckboxes.length;
+        };
+
+        if (allToggle) {
+          allToggle.addEventListener("change", function () {
+            if (allToggle.checked) {
+              storeCheckboxes.forEach(function (checkbox) {
+                checkbox.checked = false;
+              });
+            }
+            syncAllToggle();
+            syncSummary();
+          });
+        }
+
+        storeCheckboxes.forEach(function (checkbox) {
+          checkbox.addEventListener("change", function () {
+            if (checkbox.checked && allToggle) {
+              allToggle.checked = false;
+            }
+            syncAllToggle();
+            syncSummary();
+          });
+        });
+
+        syncAllToggle();
+        syncSummary();
+      }
+
+      const storeDropdowns = document.querySelectorAll(".store-assignment-dropdown");
+      storeDropdowns.forEach(function (dropdown) {
+        const allToggle = dropdown.querySelector(".store-filter-all");
+        const storeCheckboxes = Array.from(dropdown.querySelectorAll('input[name="store_ids"]'));
+        const summaryLabel = dropdown.querySelector(".store-filter-summary-label");
+
+        const updateSummary = function () {
+          const checkedCount = storeCheckboxes.filter(function (checkbox) {
+            return checkbox.checked;
+          }).length;
+
+          if (!summaryLabel) {
+            return;
+          }
+
+          if (checkedCount === 0) {
+            summaryLabel.textContent = "Selecione as lojas";
+          } else if (checkedCount === storeCheckboxes.length) {
+            summaryLabel.textContent = "Todas as lojas";
+          } else if (checkedCount === 1) {
+            summaryLabel.textContent = "1 loja selecionada";
+          } else {
+            summaryLabel.textContent = checkedCount + " lojas selecionadas";
+          }
+        };
+
+        const updateAllToggle = function () {
+          if (!allToggle) {
+            return;
+          }
+
+          allToggle.checked =
+            storeCheckboxes.length > 0 &&
+            storeCheckboxes.every(function (checkbox) {
+              return checkbox.checked;
+            });
+        };
+
+        if (allToggle) {
+          allToggle.addEventListener("change", function () {
+            storeCheckboxes.forEach(function (checkbox) {
+              checkbox.checked = allToggle.checked;
+            });
+            updateAllToggle();
+            updateSummary();
+          });
+        }
+
+        storeCheckboxes.forEach(function (checkbox) {
+          checkbox.addEventListener("change", function () {
+            updateAllToggle();
+            updateSummary();
+          });
+        });
+
+        updateAllToggle();
+        updateSummary();
+      });
       // Usa o mês como parte da chave para persistir estado por período analisado.
-      const monthInput = document.getElementById("month");
-      const monthToken = monthInput ? monthInput.value : "default";
-      const storageKeyBase = "outflows-ui:" + monthToken;
+      const dateFromInput = document.getElementById("date_from");
+      const dateToInput = document.getElementById("date_to");
+      const storageKeyBase =
+        "outflows-ui:" +
+        (dateFromInput ? dateFromInput.value : "default") +
+        ":" +
+        (dateToInput ? dateToInput.value : "default");
       const scrollKey = storageKeyBase + ":scrollY";
       const panelKey = storageKeyBase + ":outflowsPanelOpen";
       // Controle de expansão do acordeão principal de saídas.
