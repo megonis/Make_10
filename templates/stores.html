@@ -7,13 +7,15 @@
       <ul class="store-list">
         {% for store in stores %}
           <li class="store-list-item">
-            <div class="store-list-copy">
-              <strong>{{ store.name }}</strong>
-              <small>Painel da loja</small>
-            </div>
-            <a href="{{ url_for('store_detail', store_id=store.id) }}" class="store-enter-link" aria-label="Entrar na loja {{ store.name }}">
-              <span>Entrar</span>
-              <span class="store-enter-icon">›</span>
+            <a href="{{ url_for('store_detail', store_id=store.id) }}" class="store-card-link" aria-label="Entrar na loja {{ store.name }}">
+              <div class="store-list-copy">
+                <strong>{{ store.name }}</strong>
+                <small>Painel da loja</small>
+              </div>
+              <span class="store-enter-link">
+                <span>Entrar</span>
+                <span class="store-enter-icon">›</span>
+              </span>
             </a>
           </li>
         {% endfor %}

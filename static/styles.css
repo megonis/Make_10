@@ -327,6 +327,11 @@ body.modal-open {
   border-radius: 14px;
   padding: 16px;
   box-shadow: var(--shadow);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .subtle-card {
@@ -584,6 +589,11 @@ body.modal-open {
   background: linear-gradient(180deg, rgba(15, 28, 49, 0.96) 0%, rgba(10, 20, 35, 0.94) 100%);
   color: var(--text);
   text-align: left;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .payable-card-top {
@@ -729,6 +739,11 @@ body.modal-open {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .kpi small {
@@ -966,15 +981,7 @@ td {
 }
 
 .store-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(15, 28, 49, 0.96) 0%, rgba(10, 20, 35, 0.94) 100%);
-  box-shadow: 0 10px 24px rgba(2, 8, 23, 0.28);
 }
 
 .store-list-copy {
@@ -995,17 +1002,46 @@ td {
   color: var(--muted);
 }
 
+.store-card-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(15, 28, 49, 0.96) 0%, rgba(10, 20, 35, 0.94) 100%);
+  box-shadow: 0 10px 24px rgba(2, 8, 23, 0.28);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.store-card-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(94, 234, 212, 0.26);
+  box-shadow: 0 16px 32px rgba(2, 8, 23, 0.34);
+}
+
+.store-card-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
 .store-enter-link {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid rgba(45, 212, 191, 0.24);
   background: rgba(20, 184, 166, 0.12);
   color: #7cebdd;
   font-weight: 700;
-  text-decoration: none;
   white-space: nowrap;
   transition:
     transform 0.2s ease,
@@ -1040,6 +1076,28 @@ td {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(16, 31, 54, 0.84);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover,
+  .kpi:hover,
+  .payable-card:hover,
+  .payable-item:hover,
+  .store-card-link:hover {
+    transform: translateY(-2px);
+    border-color: rgba(94, 234, 212, 0.24);
+    box-shadow: 0 16px 32px rgba(2, 8, 23, 0.34);
+  }
+
+  .priority-sale:hover,
+  .subtle-card:hover {
+    border-color: rgba(94, 234, 212, 0.22);
+  }
 }
 
 .payable-item strong,
@@ -1357,6 +1415,10 @@ td {
   }
 
   .store-list li {
+    border-radius: 14px;
+  }
+
+  .store-card-link {
     flex-direction: column;
     align-items: stretch;
   }
