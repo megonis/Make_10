@@ -537,7 +537,7 @@ body.modal-open {
 }
 
 .inline-form {
-  grid-template-columns: auto auto auto;
+  grid-template-columns: repeat(auto-fit, minmax(160px, max-content));
   align-items: end;
   justify-content: start;
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import os
 
@@ -39,11 +39,39 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-OUTFLOW_TYPE_OPERATIONAL = "operational"
-OUTFLOW_TYPE_MERCHANDISE = "merchandise"
-OUTFLOW_TYPE_CHOICES = {
-    OUTFLOW_TYPE_OPERATIONAL: "Outra saida",
-    OUTFLOW_TYPE_MERCHANDISE: "Mercadoria",
+ENTRY_TYPE_OPERATIONAL = "operational_expense"
+ENTRY_TYPE_PERSONAL = "personal_expense"
+ENTRY_TYPE_MERCHANDISE = "merchandise"
+ENTRY_TYPE_CHOICES = {
+    ENTRY_TYPE_OPERATIONAL: "Despesa operacional",
+    ENTRY_TYPE_PERSONAL: "Despesa pessoal",
+    ENTRY_TYPE_MERCHANDISE: "Mercadoria",
+}
+ENTRY_CATEGORY_CHOICES = {
+    "aluguel": "Aluguel",
+    "luz": "Luz",
+    "funcionarios": "Funcionarios",
+    "retirada_pessoal": "Retirada pessoal",
+    "manutencao": "Manutencao",
+    "imposto": "Imposto",
+    "fornecedor": "Fornecedor",
+    "outros": "Outros",
+}
+ENTRY_CATEGORY_ALIASES = {
+    "aluguel": "aluguel",
+    "luz": "luz",
+    "folha": "funcionarios",
+    "folha de pagamento": "funcionarios",
+    "funcionarios": "funcionarios",
+    "funcionários": "funcionarios",
+    "pro labore": "funcionarios",
+    "pro-labore": "funcionarios",
+    "retirada pessoal": "retirada_pessoal",
+    "manutencao": "manutencao",
+    "manutenção": "manutencao",
+    "imposto": "imposto",
+    "impostos": "imposto",
+    "fornecedor": "fornecedor",
 }
 
 account_payable_stores = db.Table(
@@ -106,7 +134,8 @@ class AccountPayable(db.Model):
     description = db.Column(db.String(160), nullable=False)
     total_amount = db.Column(db.Numeric(12, 2), nullable=False)
     due_date = db.Column(db.Date, nullable=False, index=True)
-    payable_type = db.Column(db.String(20), nullable=False, default=OUTFLOW_TYPE_OPERATIONAL)
+    payable_type = db.Column(db.String(20), nullable=False, default=ENTRY_TYPE_OPERATIONAL)
+    category_code = db.Column(db.String(40), nullable=False, default="outros")
     notes = db.Column(db.String(200), nullable=True)
     is_paid = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.Date, nullable=False, default=date.today)
@@ -124,7 +153,8 @@ class CashOutflow(db.Model):
     description = db.Column(db.String(160), nullable=False)
     total_amount = db.Column(db.Numeric(12, 2), nullable=False)
     outflow_date = db.Column(db.Date, nullable=False, index=True)
-    outflow_type = db.Column(db.String(20), nullable=False, default=OUTFLOW_TYPE_OPERATIONAL)
+    outflow_type = db.Column(db.String(20), nullable=False, default=ENTRY_TYPE_OPERATIONAL)
+    category_code = db.Column(db.String(40), nullable=False, default="outros")
     category = db.Column(db.String(80), nullable=True)
     notes = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.Date, nullable=False, default=date.today)
@@ -145,6 +175,12 @@ def parse_year_month(value: str | None) -> tuple[int, int]:
     return int(year), int(month)
 
 
+def parse_date_input(value: str | None) -> date | None:
+    if not value:
+        return None
+    return datetime.strptime(value, "%Y-%m-%d").date()
+
+
 def month_days(year: int, month: int) -> list[date]:
     total_days = monthrange(year, month)[1]
     return [date(year, month, day) for day in range(1, total_days + 1)]
@@ -152,6 +188,11 @@ def month_days(year: int, month: int) -> list[date]:
 
 def workdays_monday_to_saturday(year: int, month: int) -> list[date]:
     return [d for d in month_days(year, month) if d.weekday() <= 5]
+
+
+def workdays_between(start: date, end: date) -> list[date]:
+    day_count = (end - start).days + 1
+    return [start + timedelta(days=offset) for offset in range(day_count) if (start + timedelta(days=offset)).weekday() <= 5]
 
 
 def money(value: Decimal | float | int) -> str:
@@ -168,28 +209,33 @@ def parse_decimal_input(value: str, default: str = "0") -> Decimal:
     return Decimal(normalized)
 
 
-def normalize_outflow_type(value: str | None) -> str:
+def normalize_entry_type(value: str | None) -> str:
     normalized = (value or "").strip().lower()
-    if normalized == OUTFLOW_TYPE_MERCHANDISE:
-        return OUTFLOW_TYPE_MERCHANDISE
-    return OUTFLOW_TYPE_OPERATIONAL
+    if normalized == ENTRY_TYPE_MERCHANDISE:
+        return ENTRY_TYPE_MERCHANDISE
+    if normalized == ENTRY_TYPE_PERSONAL:
+        return ENTRY_TYPE_PERSONAL
+    return ENTRY_TYPE_OPERATIONAL
 
 
-def outflow_type_label(value: str | None) -> str:
-    return OUTFLOW_TYPE_CHOICES.get(normalize_outflow_type(value), OUTFLOW_TYPE_CHOICES[OUTFLOW_TYPE_OPERATIONAL])
+def normalize_category_code(value: str | None) -> str:
+    normalized = (value or "").strip().lower().replace("-", "_")
+    if not normalized:
+        return "outros"
+    return ENTRY_CATEGORY_ALIASES.get(normalized, normalized if normalized in ENTRY_CATEGORY_CHOICES else "outros")
 
 
-def month_store_metrics(store: Store, year: int, month: int) -> dict:
-    start = date(year, month, 1)
-    end = date(year, month, monthrange(year, month)[1])
+def entry_type_label(value: str | None) -> str:
+    normalized = normalize_entry_type(value)
+    return ENTRY_TYPE_CHOICES.get(normalized, ENTRY_TYPE_CHOICES[ENTRY_TYPE_OPERATIONAL])
 
-    expenses = FixedExpense.query.filter(
-        FixedExpense.store_id == store.id,
-        FixedExpense.active.is_(True),
-        FixedExpense.start_date <= end,
-    ).all()
-    total_fixed_month = sum((e.monthly_amount for e in expenses), Decimal("0.00"))
 
+def entry_category_label(value: str | None) -> str:
+    normalized = normalize_category_code(value)
+    return ENTRY_CATEGORY_CHOICES.get(normalized, ENTRY_CATEGORY_CHOICES["outros"])
+
+
+def period_store_metrics(store: Store, start: date, end: date) -> dict:
     shared_payables = (
         AccountPayable.query.join(account_payable_stores)
         .filter(
@@ -205,15 +251,19 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     total_open_payables_month = Decimal("0.00")
     total_paid_payables_month = Decimal("0.00")
     total_payable_merchandise_month = Decimal("0.00")
+    total_personal_payables_month = Decimal("0.00")
     for payable in shared_payables:
         store_count = len(payable.stores)
         allocated_amount = (
             payable.total_amount / Decimal(store_count) if store_count else Decimal("0.00")
         )
         total_shared_month += allocated_amount
-        payable_type = normalize_outflow_type(payable.payable_type)
-        if payable_type == OUTFLOW_TYPE_MERCHANDISE:
+        payable_type = normalize_entry_type(payable.payable_type)
+        payable_category_code = normalize_category_code(payable.category_code)
+        if payable_type == ENTRY_TYPE_MERCHANDISE:
             total_payable_merchandise_month += allocated_amount
+        if payable_type == ENTRY_TYPE_PERSONAL:
+            total_personal_payables_month += allocated_amount
         if payable.is_paid:
             total_paid_payables_month += allocated_amount
         else:
@@ -228,10 +278,11 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "allocated_amount": allocated_amount,
                 "store_count": store_count,
                 "payable_type": payable_type,
-                "payable_type_label": outflow_type_label(payable.payable_type),
+                "payable_type_label": entry_type_label(payable.payable_type),
+                "category_code": payable_category_code,
+                "category_label": entry_category_label(payable.category_code),
                 "is_paid": payable.is_paid,
                 "notes": payable.notes,
-                "category": "Conta a pagar",
             }
         )
 
@@ -249,15 +300,19 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     total_outflows_month = Decimal("0.00")
     total_operational_outflows_month = Decimal("0.00")
     total_merchandise_month = Decimal("0.00")
+    total_personal_outflows_month = Decimal("0.00")
     for outflow in cash_outflows:
         store_count = len(outflow.stores)
         allocated_amount = (
             outflow.total_amount / Decimal(store_count) if store_count else Decimal("0.00")
         )
         total_outflows_month += allocated_amount
-        outflow_type = normalize_outflow_type(outflow.outflow_type)
-        if outflow_type == OUTFLOW_TYPE_MERCHANDISE:
+        outflow_type = normalize_entry_type(outflow.outflow_type)
+        outflow_category_code = normalize_category_code(outflow.category_code)
+        if outflow_type == ENTRY_TYPE_MERCHANDISE:
             total_merchandise_month += allocated_amount
+        elif outflow_type == ENTRY_TYPE_PERSONAL:
+            total_personal_outflows_month += allocated_amount
         else:
             total_operational_outflows_month += allocated_amount
         cash_outflow_rows.append(
@@ -267,7 +322,9 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "description": outflow.description,
                 "event_date": outflow.outflow_date,
                 "outflow_type": outflow_type,
-                "outflow_type_label": outflow_type_label(outflow.outflow_type),
+                "outflow_type_label": entry_type_label(outflow.outflow_type),
+                "category_code": outflow_category_code,
+                "category_label": entry_category_label(outflow.category_code),
                 "category": outflow.category,
                 "total_amount": outflow.total_amount,
                 "allocated_amount": allocated_amount,
@@ -284,10 +341,12 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "event_date": item["event_date"],
                 "allocated_amount": item["allocated_amount"],
                 "status": "Paga",
-                "category": item.get("category") or item.get("payable_type_label") or "Conta a pagar",
+                "entry_type_label": item.get("payable_type_label"),
+                "category": item.get("category_label") or "Outros",
+                "details": item.get("notes"),
             }
             for item in shared_payable_rows
-            if item.get("is_paid") and item.get("payable_type") != OUTFLOW_TYPE_MERCHANDISE
+            if item.get("is_paid") and item.get("payable_type") != ENTRY_TYPE_MERCHANDISE
         ]
         + [
             {
@@ -296,10 +355,12 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "event_date": item["event_date"],
                 "allocated_amount": item["allocated_amount"],
                 "status": "Pago",
-                "category": item.get("category") or item.get("outflow_type_label") or "Saida",
+                "entry_type_label": item.get("outflow_type_label"),
+                "category": item.get("category_label") or "Outros",
+                "details": item.get("category") or item.get("notes"),
             }
             for item in cash_outflow_rows
-            if item.get("outflow_type") != OUTFLOW_TYPE_MERCHANDISE
+            if item.get("outflow_type") != ENTRY_TYPE_MERCHANDISE
         ],
         key=lambda item: (item["event_date"], item["description"].lower()),
         reverse=True,
@@ -312,12 +373,16 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     ).all()
     total_sales_month = sum((s.amount for s in sales), Decimal("0.00"))
 
-    workdays = workdays_monday_to_saturday(year, month)
+    workdays = workdays_between(start, end)
+    total_personal_month = total_personal_payables_month + total_personal_outflows_month
     total_expense_bucket_month = (
-        total_paid_payables_month - total_payable_merchandise_month + total_operational_outflows_month
+        total_paid_payables_month
+        - total_payable_merchandise_month
+        - total_personal_payables_month
+        + total_operational_outflows_month
     )
-    total_expenses_month = total_fixed_month + total_shared_month + total_outflows_month
-    fixed_per_day = total_expenses_month / Decimal(len(workdays)) if workdays else Decimal("0.00")
+    total_expenses_month = total_shared_month + total_outflows_month
+    expense_per_day = total_expenses_month / Decimal(len(workdays)) if workdays else Decimal("0.00")
 
     sales_by_day = defaultdict(lambda: Decimal("0.00"))
     for s in sales:
@@ -330,27 +395,28 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
             {
                 "date": d,
                 "sales": sales_value,
-                "fixed_allocated": fixed_per_day,
-                "result": sales_value - fixed_per_day,
+                "expense_allocated": expense_per_day,
+                "result": sales_value - expense_per_day,
             }
         )
 
     return {
-        "total_fixed_month": total_fixed_month,
         "total_shared_payables_month": total_shared_month,
         "total_open_payables_month": total_open_payables_month,
         "total_paid_payables_month": total_paid_payables_month,
         "total_outflows_month": total_outflows_month,
         "total_operational_outflows_month": total_operational_outflows_month,
+        "total_personal_outflows_month": total_personal_outflows_month,
+        "total_personal_payables_month": total_personal_payables_month,
+        "total_personal_month": total_personal_month,
         "total_merchandise_month": total_merchandise_month + total_payable_merchandise_month,
         "total_expense_bucket_month": total_expense_bucket_month,
         "total_expenses_month": total_expenses_month,
         "total_sales_month": total_sales_month,
-        "fixed_per_day": fixed_per_day,
+        "expense_per_day": expense_per_day,
         "month_result": total_sales_month - total_expenses_month,
         "workdays_count": len(workdays),
         "day_rows": day_rows,
-        "expenses": expenses,
         "shared_payables": shared_payable_rows,
         "open_shared_payables": [item for item in shared_payable_rows if not item.get("is_paid")],
         "cash_outflows": cash_outflow_rows,
@@ -358,12 +424,19 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     }
 
 
+def month_store_metrics(store: Store, year: int, month: int) -> dict:
+    start = date(year, month, 1)
+    end = date(year, month, monthrange(year, month)[1])
+    return period_store_metrics(store, start, end)
+
+
 @app.context_processor
 def inject_helpers():
     return {
         "money": money,
         "is_authenticated": is_authenticated(),
-        "outflow_type_label": outflow_type_label,
+        "entry_type_label": entry_type_label,
+        "entry_category_label": entry_category_label,
     }
 
 
@@ -395,17 +468,35 @@ def disable_cache_in_debug(response):
 @app.route("/")
 def index():
     selected_month = request.args.get("month")
+    start_raw = request.args.get("date_from")
+    end_raw = request.args.get("date_to")
+
     year, month = parse_year_month(selected_month)
+    default_start = date(year, month, 1)
+    default_end = date(year, month, monthrange(year, month)[1])
+
+    try:
+        selected_start = parse_date_input(start_raw) or default_start
+        selected_end = parse_date_input(end_raw) or default_end
+    except ValueError:
+        flash("Periodo invalido. Usando o mes selecionado.", "error")
+        selected_start = default_start
+        selected_end = default_end
+
+    if selected_start > selected_end:
+        flash("A data inicial precisa ser menor ou igual a data final.", "error")
+        selected_start = default_start
+        selected_end = default_end
+
     month_token = f"{year:04d}-{month:02d}"
 
     stores = Store.query.order_by(Store.name).all()
     metrics = []
     for store in stores:
-        data = month_store_metrics(store, year, month)
+        data = period_store_metrics(store, selected_start, selected_end)
         metrics.append({"store": store, "data": data})
 
     total_sales = sum((m["data"]["total_sales_month"] for m in metrics), Decimal("0.00"))
-    total_fixed = sum((m["data"]["total_fixed_month"] for m in metrics), Decimal("0.00"))
     total_shared_payables = sum(
         (m["data"]["total_shared_payables_month"] for m in metrics), Decimal("0.00")
     )
@@ -416,22 +507,25 @@ def index():
     total_paid_payables = sum(
         (m["data"]["total_paid_payables_month"] for m in metrics), Decimal("0.00")
     )
+    total_personal = sum((m["data"]["total_personal_month"] for m in metrics), Decimal("0.00"))
     total_merchandise = sum(
         (m["data"]["total_merchandise_month"] for m in metrics), Decimal("0.00")
     )
-    total_expense_bucket = total_paid_payables + total_operational_outflows
-    total_expenses = total_fixed + total_shared_payables + total_outflows
+    total_expense_bucket = total_paid_payables - total_personal + total_operational_outflows
+    total_expenses = total_shared_payables + total_outflows
 
     return render_template(
         "index.html",
         month_token=month_token,
+        date_from_value=selected_start.strftime("%Y-%m-%d"),
+        date_to_value=selected_end.strftime("%Y-%m-%d"),
         metrics=metrics,
         total_sales=total_sales,
-        total_fixed=total_fixed,
         total_shared_payables=total_shared_payables,
         total_outflows=total_outflows,
         total_operational_outflows=total_operational_outflows,
         total_paid_payables=total_paid_payables,
+        total_personal=total_personal,
         total_expense_bucket=total_expense_bucket,
         total_merchandise=total_merchandise,
         total_expenses=total_expenses,
@@ -468,7 +562,8 @@ def payables():
         description = request.form.get("description", "").strip()
         total_amount_raw = request.form.get("total_amount", "0")
         due_date_raw = request.form.get("due_date")
-        payable_type = normalize_outflow_type(request.form.get("payable_type"))
+        payable_type = normalize_entry_type(request.form.get("payable_type"))
+        category_code = normalize_category_code(request.form.get("category_code"))
         notes = request.form.get("notes", "").strip() or None
         selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
 
@@ -489,6 +584,7 @@ def payables():
                     total_amount=parse_decimal_input(total_amount_raw),
                     due_date=due_date_value,
                     payable_type=payable_type,
+                    category_code=category_code,
                     notes=notes,
                     stores=selected_stores,
                 )
@@ -521,7 +617,8 @@ def payables():
         payables=payable_items,
         month_token=month_token,
         today=date.today(),
-        payable_type_choices=OUTFLOW_TYPE_CHOICES,
+        entry_type_choices=ENTRY_TYPE_CHOICES,
+        entry_category_choices=ENTRY_CATEGORY_CHOICES,
     )
 
 
@@ -532,7 +629,8 @@ def update_payable(payable_id: int):
     description = request.form.get("description", "").strip()
     total_amount_raw = request.form.get("total_amount", "0")
     due_date_raw = request.form.get("due_date")
-    payable_type = normalize_outflow_type(request.form.get("payable_type"))
+    payable_type = normalize_entry_type(request.form.get("payable_type"))
+    category_code = normalize_category_code(request.form.get("category_code"))
     notes = request.form.get("notes", "").strip() or None
     selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
     is_paid = request.form.get("is_paid") == "on"
@@ -552,6 +650,7 @@ def update_payable(payable_id: int):
         payable.total_amount = parse_decimal_input(total_amount_raw)
         payable.due_date = due_date_value
         payable.payable_type = payable_type
+        payable.category_code = category_code
         payable.notes = notes
         payable.is_paid = is_paid
         payable.stores = selected_stores
@@ -589,7 +688,8 @@ def outflows():
         description = request.form.get("description", "").strip()
         total_amount_raw = request.form.get("total_amount", "0")
         outflow_date_raw = request.form.get("outflow_date")
-        outflow_type = normalize_outflow_type(request.form.get("outflow_type"))
+        outflow_type = normalize_entry_type(request.form.get("outflow_type"))
+        category_code = normalize_category_code(request.form.get("category_code"))
         category = request.form.get("category", "").strip() or None
         notes = request.form.get("notes", "").strip() or None
         selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
@@ -611,6 +711,7 @@ def outflows():
                     total_amount=parse_decimal_input(total_amount_raw),
                     outflow_date=outflow_date_value,
                     outflow_type=outflow_type,
+                    category_code=category_code,
                     category=category,
                     notes=notes,
                     stores=selected_stores,
@@ -643,7 +744,8 @@ def outflows():
         stores=stores,
         outflows=outflow_items,
         month_token=month_token,
-        outflow_type_choices=OUTFLOW_TYPE_CHOICES,
+        entry_type_choices=ENTRY_TYPE_CHOICES,
+        entry_category_choices=ENTRY_CATEGORY_CHOICES,
     )
 
 
@@ -654,7 +756,8 @@ def update_outflow(outflow_id: int):
     description = request.form.get("description", "").strip()
     total_amount_raw = request.form.get("total_amount", "0")
     outflow_date_raw = request.form.get("outflow_date")
-    outflow_type = normalize_outflow_type(request.form.get("outflow_type"))
+    outflow_type = normalize_entry_type(request.form.get("outflow_type"))
+    category_code = normalize_category_code(request.form.get("category_code"))
     category = request.form.get("category", "").strip() or None
     notes = request.form.get("notes", "").strip() or None
     selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
@@ -674,6 +777,7 @@ def update_outflow(outflow_id: int):
         outflow.total_amount = parse_decimal_input(total_amount_raw)
         outflow.outflow_date = outflow_date_value
         outflow.outflow_type = outflow_type
+        outflow.category_code = category_code
         outflow.category = category
         outflow.notes = notes
         outflow.stores = selected_stores
@@ -779,33 +883,7 @@ def store_detail(store_id: int):
 
     if request.method == "POST":
         action = request.form.get("action")
-        if action == "expense":
-            description = request.form.get("description", "").strip()
-            monthly_amount_raw = request.form.get("monthly_amount", "0")
-            start_date_raw = request.form.get("start_date")
-            if description:
-                try:
-                    start_date_value = (
-                        datetime.strptime(start_date_raw, "%Y-%m-%d").date()
-                        if start_date_raw
-                        else date.today()
-                    )
-                    db.session.add(
-                        FixedExpense(
-                            store_id=store.id,
-                            description=description,
-                            monthly_amount=parse_decimal_input(monthly_amount_raw),
-                            start_date=start_date_value,
-                            active=True,
-                        )
-                    )
-                    db.session.commit()
-                    flash("Despesa cadastrada com sucesso.", "success")
-                except (ArithmeticError, ValueError, SQLAlchemyError):
-                    db.session.rollback()
-                    app.logger.exception("Erro ao cadastrar despesa fixa.")
-                    flash("Nao foi possivel salvar a despesa.", "error")
-        elif action == "sale":
+        if action == "sale":
             sale_date_raw = request.form.get("sale_date")
             amount_raw = request.form.get("amount", "0")
             notes = request.form.get("notes", "").strip() or None

@@ -36,7 +36,11 @@
             </div>
             <div>
               <small>Tipo</small>
-              <span>{{ outflow_type_label(payable.payable_type) }}</span>
+              <span>{{ entry_type_label(payable.payable_type) }}</span>
+            </div>
+            <div>
+              <small>Categoria</small>
+              <span>{{ entry_category_label(payable.category_code) }}</span>
             </div>
           </div>
         </button>
@@ -62,8 +66,15 @@
 
             <label for="payable_type-{{ payable.id }}">Tipo da conta</label>
             <select id="payable_type-{{ payable.id }}" name="payable_type" required>
-              {% for option_value, option_label in payable_type_choices.items() %}
+              {% for option_value, option_label in entry_type_choices.items() %}
                 <option value="{{ option_value }}" {% if payable.payable_type == option_value %}selected{% endif %}>{{ option_label }}</option>
+              {% endfor %}
+            </select>
+
+            <label for="category_code-{{ payable.id }}">Categoria</label>
+            <select id="category_code-{{ payable.id }}" name="category_code" required>
+              {% for option_value, option_label in entry_category_choices.items() %}
+                <option value="{{ option_value }}" {% if payable.category_code == option_value %}selected{% endif %}>{{ option_label }}</option>
               {% endfor %}
             </select>
 
@@ -162,7 +173,14 @@
 
       <label for="payable_type">Tipo da conta</label>
       <select id="payable_type" name="payable_type" required>
-        {% for option_value, option_label in payable_type_choices.items() %}
+        {% for option_value, option_label in entry_type_choices.items() %}
+          <option value="{{ option_value }}">{{ option_label }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="category_code">Categoria</label>
+      <select id="category_code" name="category_code" required>
+        {% for option_value, option_label in entry_category_choices.items() %}
           <option value="{{ option_value }}">{{ option_label }}</option>
         {% endfor %}
       </select>

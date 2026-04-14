@@ -3,8 +3,10 @@
   <section class="card">
     <h2>Resumo Geral</h2>
     <form method="get" class="inline-form">
-      <label for="month">Mês de Analise</label>
-      <input id="month" name="month" type="month" value="{{ month_token }}" />
+      <label for="date_from">Data inicial</label>
+      <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
+      <label for="date_to">Data final</label>
+      <input id="date_to" name="date_to" type="date" value="{{ date_to_value }}" />
       <button type="submit">Atualizar</button>
     </form>
     <div class="kpi-grid">
@@ -13,12 +15,12 @@
         <strong>{{ money(total_sales) }}</strong>
       </article>
       <article class="kpi">
-        <small>Despesas fixas</small>
-        <strong>{{ money(total_fixed) }}</strong>
-      </article>
-      <article class="kpi">
         <small>Despesas</small>
         <strong>{{ money(total_expense_bucket) }}</strong>
+      </article>
+      <article class="kpi">
+        <small>Despesas pessoais</small>
+        <strong>{{ money(total_personal) }}</strong>
       </article>
       <article class="kpi">
         <small>Mercadoria no mes</small>
@@ -43,11 +45,11 @@
           <tr>
             <th>Loja</th>
             <th>Vendas no mês</th>
-            <th>Despesas fixas</th>
             <th>Despesas</th>
+            <th>Despesas pessoais</th>
             <th>Mercadoria</th>
             <th>Total despesas</th>
-            <th>Custo fixo por dia</th>
+            <th>Despesa media por dia</th>
             <th>Resultado</th>
           </tr>
         </thead>
@@ -62,11 +64,11 @@
             >
               <td data-label="Loja" class="store-name-cell">{{ item.store.name }}</td>
               <td data-label="Vendas no mês">{{ money(item.data.total_sales_month) }}</td>
-              <td data-label="Despesas fixas">{{ money(item.data.total_fixed_month) }}</td>
               <td data-label="Despesas">{{ money(item.data.total_expense_bucket_month) }}</td>
+              <td data-label="Despesas pessoais">{{ money(item.data.total_personal_month) }}</td>
               <td data-label="Mercadoria">{{ money(item.data.total_merchandise_month) }}</td>
               <td data-label="Total despesas">{{ money(item.data.total_expenses_month) }}</td>
-              <td data-label="Custo fixo por dia">{{ money(item.data.fixed_per_day) }}</td>
+              <td data-label="Despesa media por dia">{{ money(item.data.expense_per_day) }}</td>
               <td data-label="Resultado">{{ money(item.data.month_result) }}</td>
             </tr>
           {% endfor %}

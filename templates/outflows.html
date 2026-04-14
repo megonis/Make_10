@@ -43,11 +43,15 @@
                 </div>
                 <div>
                   <small>Categoria</small>
-                  <span>{{ outflow.category or "-" }}</span>
+                  <span>{{ entry_category_label(outflow.category_code) }}</span>
                 </div>
                 <div>
                   <small>Tipo</small>
-                  <span>{{ outflow_type_label(outflow.outflow_type) }}</span>
+                  <span>{{ entry_type_label(outflow.outflow_type) }}</span>
+                </div>
+                <div>
+                  <small>Complemento</small>
+                  <span>{{ outflow.category or "-" }}</span>
                 </div>
                 <div>
                   <small>Lojas</small>
@@ -77,13 +81,20 @@
 
                 <label for="outflow_type-{{ outflow.id }}">Tipo da saida</label>
                 <select id="outflow_type-{{ outflow.id }}" name="outflow_type" required>
-                  {% for option_value, option_label in outflow_type_choices.items() %}
+                  {% for option_value, option_label in entry_type_choices.items() %}
                     <option value="{{ option_value }}" {% if outflow.outflow_type == option_value %}selected{% endif %}>{{ option_label }}</option>
                   {% endfor %}
                 </select>
 
-                <label for="category-{{ outflow.id }}">Categoria</label>
-                <input id="category-{{ outflow.id }}" name="category" value="{{ outflow.category or '' }}" placeholder="Limpeza, manutencao, compra..." />
+                <label for="category_code-{{ outflow.id }}">Categoria</label>
+                <select id="category_code-{{ outflow.id }}" name="category_code" required>
+                  {% for option_value, option_label in entry_category_choices.items() %}
+                    <option value="{{ option_value }}" {% if outflow.category_code == option_value %}selected{% endif %}>{{ option_label }}</option>
+                  {% endfor %}
+                </select>
+
+                <label for="category-{{ outflow.id }}">Complemento da categoria</label>
+                <input id="category-{{ outflow.id }}" name="category" value="{{ outflow.category or '' }}" placeholder="Opcional: limpeza pesada, fornecedor X..." />
 
                 <label for="notes-{{ outflow.id }}">Observacao</label>
                 <input id="notes-{{ outflow.id }}" name="notes" value="{{ outflow.notes or '' }}" />
@@ -132,12 +143,19 @@
 
       <label for="outflow_type">Tipo da saida</label>
       <select id="outflow_type" name="outflow_type" required>
-        {% for option_value, option_label in outflow_type_choices.items() %}
+        {% for option_value, option_label in entry_type_choices.items() %}
           <option value="{{ option_value }}">{{ option_label }}</option>
         {% endfor %}
       </select>
 
-      <label for="category">Categoria</label>
+      <label for="category_code">Categoria</label>
+      <select id="category_code" name="category_code" required>
+        {% for option_value, option_label in entry_category_choices.items() %}
+          <option value="{{ option_value }}">{{ option_label }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="category">Complemento da categoria</label>
       <input id="category" name="category" placeholder="Opcional" />
 
       <label for="notes">Observacao</label>

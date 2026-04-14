@@ -25,12 +25,12 @@
           <strong>{{ money(data.total_sales_month) }}</strong>
         </article>
         <article class="kpi">
-          <small>Despesas fixas</small>
-          <strong>{{ money(data.total_fixed_month) }}</strong>
-        </article>
-        <article class="kpi">
           <small>Despesas</small>
           <strong>{{ money(data.total_expense_bucket_month) }}</strong>
+        </article>
+        <article class="kpi">
+          <small>Despesas pessoais</small>
+          <strong>{{ money(data.total_personal_month) }}</strong>
         </article>
         <article class="kpi">
           <small>Mercadoria no mes</small>
@@ -41,8 +41,8 @@
           <strong>{{ money(data.total_expenses_month) }}</strong>
         </article>
         <article class="kpi">
-          <small>Custo fixo por dia</small>
-          <strong>{{ money(data.fixed_per_day) }}</strong>
+          <small>Despesa media por dia</small>
+          <strong>{{ money(data.expense_per_day) }}</strong>
         </article>
         <article class="kpi">
           <small>Resultado do mês</small>
@@ -82,6 +82,7 @@
               <div>
                 <strong>{{ payable.description }}</strong>
                 <small>Vencimento: {{ payable.event_date.strftime("%d/%m/%Y") }}</small>
+                <small>{{ payable.payable_type_label }} | {{ payable.category_label }}</small>
               </div>
               <div class="payable-meta">
                 <span>{{ money(payable.allocated_amount) }}</span>
@@ -112,8 +113,14 @@
               <div>
                 <strong>{{ item.description }}</strong>
                 <small>Data: {{ item.event_date.strftime("%d/%m/%Y") }}</small>
+                {% if item.entry_type_label %}
+                  <small>{{ item.entry_type_label }}</small>
+                {% endif %}
                 {% if item.category %}
                   <small>{{ item.category }}</small>
+                {% endif %}
+                {% if item.details %}
+                  <small>{{ item.details }}</small>
                 {% endif %}
               </div>
               <div class="payable-meta">
@@ -137,7 +144,7 @@
           <tr>
             <th>Data</th>
             <th>Venda do dia</th>
-            <th>Rateio fixo</th>
+            <th>Despesa media do dia</th>
             <th>Resultado do dia</th>
           </tr>
         </thead>
@@ -146,7 +153,7 @@
             <tr>
               <td>{{ row.date.strftime("%d/%m/%Y") }}</td>
               <td>{{ money(row.sales) }}</td>
-              <td>{{ money(row.fixed_allocated) }}</td>
+              <td>{{ money(row.expense_allocated) }}</td>
               <td>{{ money(row.result) }}</td>
             </tr>
           {% endfor %}
