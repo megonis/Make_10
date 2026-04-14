@@ -59,13 +59,19 @@
     <h3>Nova Venda Diária</h3>
     <form method="post" class="grid-form priority-sale-form" autocomplete="off">
       <input type="hidden" name="action" value="sale" />
-      <label for="sale_date">Data da venda</label>
-      <input id="sale_date" name="sale_date" type="date" required autocomplete="off" />
-      <label for="amount">Valor da venda (R$)</label>
-      <input id="amount" name="amount" type="number" step="0.01" min="0" required autocomplete="off" />
-      <label for="notes">Observação</label>
-      <input id="notes" name="notes" placeholder="Opcional" autocomplete="off" />
-      <button type="submit">Salvar venda</button>
+      <label for="sale_date" class="summary-filter-field priority-sale-field">
+        <span>Data da venda</span>
+        <input id="sale_date" name="sale_date" type="date" required autocomplete="off" />
+      </label>
+      <label for="amount" class="summary-filter-field priority-sale-field">
+        <span>Valor da venda (R$)</span>
+        <input id="amount" name="amount" type="number" step="0.01" min="0" required autocomplete="off" />
+      </label>
+      <label for="notes" class="summary-filter-field priority-sale-field">
+        <span>Observação</span>
+        <input id="notes" name="notes" placeholder="Opcional" autocomplete="off" />
+      </label>
+      <button type="submit" class="summary-filter-button priority-sale-button">Salvar venda</button>
     </form>
   </section>
 

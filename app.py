@@ -491,8 +491,24 @@ def index():
     month_token = f"{year:04d}-{month:02d}"
 
     stores = Store.query.order_by(Store.name).all()
+    available_store_ids = {store.id for store in stores}
+    selected_store_ids = []
+    for raw_value in request.args.getlist("store_ids"):
+        try:
+            store_id = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if store_id in available_store_ids and store_id not in selected_store_ids:
+            selected_store_ids.append(store_id)
+
+    selected_store_set = set(selected_store_ids)
+    if selected_store_ids:
+        filtered_stores = [store for store in stores if store.id in selected_store_set]
+    else:
+        filtered_stores = stores
+
     metrics = []
-    for store in stores:
+    for store in filtered_stores:
         data = period_store_metrics(store, selected_start, selected_end)
         metrics.append({"store": store, "data": data})
 
@@ -519,6 +535,8 @@ def index():
         month_token=month_token,
         date_from_value=selected_start.strftime("%Y-%m-%d"),
         date_to_value=selected_end.strftime("%Y-%m-%d"),
+        stores=stores,
+        selected_store_ids=selected_store_ids,
         metrics=metrics,
         total_sales=total_sales,
         total_shared_payables=total_shared_payables,

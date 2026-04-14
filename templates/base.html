@@ -5,33 +5,61 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Painel Financeiro de Lojas</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='favicon.jpg') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
-    <!-- Cabeçalho principal exibido apenas para usuários autenticados. -->
     {% if is_authenticated %}
-      <header class="header">
-        <div class="header-brand">
-          <div class="brand-copy">
-            <h1><a href="{{ url_for('index') }}">Painel Financeiro</a></h1>
-            <p>Controle financeiro das lojas</p>
+      <div class="app-shell">
+        <aside class="sidebar" id="app-sidebar">
+          <div class="sidebar-brand">
+            <a href="{{ url_for('index') }}" class="sidebar-brand-link">
+              <span class="sidebar-brand-mark">M10</span>
+              <span class="sidebar-brand-copy">
+                <strong>Painel Financeiro</strong>
+                <small>Controle financeiro das lojas</small>
+              </span>
+            </a>
           </div>
-        </div>
-        <!-- Navegação entre os módulos principais do sistema. -->
-        <nav class="main-nav">
-          <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}is-active{% endif %}">Resumo</a>
-          <a href="{{ url_for('stores') }}" class="nav-link {% if request.endpoint == 'stores' or request.endpoint == 'store_detail' %}is-active{% endif %}">Lojas</a>
-          <a href="{{ url_for('payables') }}" class="nav-link {% if request.endpoint == 'payables' or request.endpoint == 'update_payable' %}is-active{% endif %}">Contas a Pagar</a>
-          <a href="{{ url_for('outflows') }}" class="nav-link {% if request.endpoint == 'outflows' or request.endpoint == 'update_outflow' %}is-active{% endif %}">Saidas</a>
-        </nav>
-      </header>
+
+          <!-- Navegação principal no layout lateral. -->
+          <nav class="sidebar-nav">
+            <a href="{{ url_for('index') }}" class="nav-link sidebar-link {% if request.endpoint == 'index' %}is-active{% endif %}">Resumo</a>
+            <a href="{{ url_for('stores') }}" class="nav-link sidebar-link {% if request.endpoint == 'stores' or request.endpoint == 'store_detail' %}is-active{% endif %}">Lojas</a>
+            <a href="{{ url_for('payables') }}" class="nav-link sidebar-link {% if request.endpoint == 'payables' or request.endpoint == 'update_payable' %}is-active{% endif %}">Contas a Pagar</a>
+            <a href="{{ url_for('outflows') }}" class="nav-link sidebar-link {% if request.endpoint == 'outflows' or request.endpoint == 'update_outflow' %}is-active{% endif %}">Saidas</a>
+          </nav>
+
+          <form method="post" action="{{ url_for('logout') }}" class="sidebar-logout">
+            <button type="submit" class="ghost-button sidebar-logout-button">Sair</button>
+          </form>
+        </aside>
+
+        <div class="sidebar-backdrop" data-nav-close hidden></div>
+
+        <div class="app-content">
+          <div class="mobile-topbar">
+            <button
+              type="button"
+              class="mobile-nav-toggle"
+              aria-controls="app-sidebar"
+              aria-expanded="false"
+              aria-label="Abrir menu"
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <a href="{{ url_for('index') }}" class="mobile-topbar-title">Painel Financeiro</a>
+          </div>
+
+          {% if header_title %}
+            <div class="store-focus-header-wrap">
+              <div class="store-focus-header">{{ header_title }}</div>
+            </div>
+          {% endif %}
     {% endif %}
-    <!-- Faixa contextual usada em páginas com foco em uma loja específica. -->
-    {% if header_title %}
-      <div class="store-focus-header-wrap">
-        <div class="store-focus-header">{{ header_title }}</div>
-      </div>
-    {% endif %}
+
     <main class="container">
       <!-- Mensagens temporárias de sucesso/erro retornadas pelo backend. -->
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -46,5 +74,57 @@
       <!-- Área onde cada template filho injeta o conteúdo da sua tela. -->
       {% block content %}{% endblock %}
     </main>
+
+    {% if is_authenticated %}
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          const body = document.body;
+          const sidebar = document.getElementById("app-sidebar");
+          const toggle = document.querySelector(".mobile-nav-toggle");
+          const backdrop = document.querySelector(".sidebar-backdrop");
+
+          if (!sidebar || !toggle || !backdrop) {
+            return;
+          }
+
+          const setOpen = function (isOpen) {
+            body.classList.toggle("nav-open", isOpen);
+            toggle.setAttribute("aria-expanded", String(isOpen));
+            backdrop.hidden = !isOpen;
+          };
+
+          toggle.addEventListener("click", function () {
+            setOpen(!body.classList.contains("nav-open"));
+          });
+
+          backdrop.addEventListener("click", function () {
+            setOpen(false);
+          });
+
+          sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", function () {
+              if (window.innerWidth <= 900) {
+                setOpen(false);
+              }
+            });
+          });
+
+          window.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+              setOpen(false);
+            }
+          });
+
+          window.addEventListener("resize", function () {
+            if (window.innerWidth > 900) {
+              setOpen(false);
+            }
+          });
+        })();
+      </script>
+    {% endif %}
   </body>
 </html>

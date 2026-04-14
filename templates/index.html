@@ -13,6 +13,47 @@
         <span>Data final</span>
         <input id="date_to" name="date_to" type="date" value="{{ date_to_value }}" />
       </label>
+      <!-- Seletor de múltiplas lojas para compor o resumo geral. -->
+      <div class="summary-filter-field summary-store-filter">
+        <span>Lojas no resumo</span>
+        <details class="store-filter-dropdown">
+          <summary class="store-filter-summary">
+            <span class="store-filter-summary-label">
+              {% if not selected_store_ids %}
+                Todas as lojas
+              {% elif selected_store_ids|length == 1 %}
+                1 loja selecionada
+              {% else %}
+                {{ selected_store_ids|length }} lojas selecionadas
+              {% endif %}
+            </span>
+            <span class="store-filter-summary-icon">▾</span>
+          </summary>
+          <div class="store-filter-panel">
+            <label class="store-filter-option store-filter-option-all">
+              <input
+                type="checkbox"
+                class="store-filter-all"
+                {% if not selected_store_ids %}checked{% endif %}
+              />
+              <span>Todas as lojas</span>
+            </label>
+            <div class="store-filter-options">
+              {% for store in stores %}
+                <label class="store-filter-option">
+                  <input
+                    type="checkbox"
+                    name="store_ids"
+                    value="{{ store.id }}"
+                    {% if store.id in selected_store_ids %}checked{% endif %}
+                  />
+                  <span>{{ store.name }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      </div>
       <button type="submit" class="summary-filter-button">Atualizar</button>
     </form>
     <!-- Grade responsiva dos indicadores financeiros gerais. -->
@@ -88,6 +129,76 @@
   </section>
   <script>
     (function () {
+      // Mantém o seletor de lojas funcional com opção rápida para todas as lojas.
+      const dropdown = document.querySelector(".store-filter-dropdown");
+      if (dropdown) {
+        const allToggle = dropdown.querySelector(".store-filter-all");
+        const storeCheckboxes = Array.from(
+          dropdown.querySelectorAll('input[name="store_ids"]')
+        );
+        const summaryLabel = dropdown.querySelector(".store-filter-summary-label");
+
+        const syncSummary = function () {
+          const checkedCount = storeCheckboxes.filter(function (checkbox) {
+            return checkbox.checked;
+          }).length;
+
+          if (!summaryLabel) {
+            return;
+          }
+
+          if (checkedCount === 0 || checkedCount === storeCheckboxes.length) {
+            summaryLabel.textContent = "Todas as lojas";
+            return;
+          }
+
+          if (checkedCount === 1) {
+            summaryLabel.textContent = "1 loja selecionada";
+            return;
+          }
+
+          summaryLabel.textContent = checkedCount + " lojas selecionadas";
+        };
+
+        const syncAllToggle = function () {
+          const checkedCount = storeCheckboxes.filter(function (checkbox) {
+            return checkbox.checked;
+          }).length;
+
+          if (!allToggle) {
+            return;
+          }
+
+          allToggle.checked =
+            checkedCount === 0 || checkedCount === storeCheckboxes.length;
+        };
+
+        if (allToggle) {
+          allToggle.addEventListener("change", function () {
+            if (allToggle.checked) {
+              storeCheckboxes.forEach(function (checkbox) {
+                checkbox.checked = false;
+              });
+            }
+            syncAllToggle();
+            syncSummary();
+          });
+        }
+
+        storeCheckboxes.forEach(function (checkbox) {
+          checkbox.addEventListener("change", function () {
+            if (checkbox.checked && allToggle) {
+              allToggle.checked = false;
+            }
+            syncAllToggle();
+            syncSummary();
+          });
+        });
+
+        syncAllToggle();
+        syncSummary();
+      }
+
       // Transforma as linhas da tabela em links clicáveis via mouse e teclado.
       const rows = document.querySelectorAll(".summary-row-link");
       rows.forEach(function (row) {

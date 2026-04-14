@@ -29,7 +29,7 @@
               <span>{{ money(payable.total_amount) }}</span>
             </div>
             <div>
-              <small>Rateio por loja</small>
+              <small>Valores por loja</small>
               <span>{{ money(payable.total_amount / count if count else 0) }}</span>
             </div>
             <div>
@@ -89,7 +89,7 @@
             </label>
 
             <div class="store-checkbox-group">
-              <span>Lojas que vao receber o rateio</span>
+              <span>Lojas que vao receber os valores</span>
               {% for store in stores %}
                 <label class="store-checkbox">
                   <input
@@ -195,7 +195,7 @@
       <input id="notes" name="notes" placeholder="Opcional" />
 
       <div class="store-checkbox-group">
-        <span>Lojas que vao receber o rateio</span>
+        <span>Lojas que vao receber os valores</span>
         {% for store in stores %}
           <label class="store-checkbox">
             <input type="checkbox" name="store_ids" value="{{ store.id }}" />
