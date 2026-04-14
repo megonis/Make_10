@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
+    <!-- Metadados básicos e carregamento do CSS global do painel. -->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Painel Financeiro de Lojas</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
+    <!-- Cabeçalho principal exibido apenas para usuários autenticados. -->
     {% if is_authenticated %}
       <header class="header">
         <div class="header-brand">
@@ -15,6 +17,7 @@
             <p>Controle financeiro das lojas</p>
           </div>
         </div>
+        <!-- Navegação entre os módulos principais do sistema. -->
         <nav class="main-nav">
           <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}is-active{% endif %}">Resumo</a>
           <a href="{{ url_for('stores') }}" class="nav-link {% if request.endpoint == 'stores' or request.endpoint == 'store_detail' %}is-active{% endif %}">Lojas</a>
@@ -23,12 +26,14 @@
         </nav>
       </header>
     {% endif %}
+    <!-- Faixa contextual usada em páginas com foco em uma loja específica. -->
     {% if header_title %}
       <div class="store-focus-header-wrap">
         <div class="store-focus-header">{{ header_title }}</div>
       </div>
     {% endif %}
     <main class="container">
+      <!-- Mensagens temporárias de sucesso/erro retornadas pelo backend. -->
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <section class="flash-stack">
@@ -38,6 +43,7 @@
           </section>
         {% endif %}
       {% endwith %}
+      <!-- Área onde cada template filho injeta o conteúdo da sua tela. -->
       {% block content %}{% endblock %}
     </main>
   </body>

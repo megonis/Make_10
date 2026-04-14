@@ -1,5 +1,6 @@
 ﻿{% extends "base.html" %}
 {% block content %}
+  <!-- Cabeçalho da loja com atalho para expandir ou recolher o resumo mensal. -->
   <section class="card">
     <button
       type="button"
@@ -13,6 +14,7 @@
       <span class="arrow">^</span>
     </button>
 
+    <!-- Painel do mês analisado com KPIs específicos da loja. -->
     <div id="month-data-panel" hidden>
       <form method="get" class="inline-form" autocomplete="off">
         <label for="month">Mês de análise</label>
@@ -52,6 +54,7 @@
     </div>
   </section>
 
+  <!-- Formulário prioritário para lançamento rápido de vendas diárias. -->
   <section class="card priority-sale">
     <h3>Nova Venda Diária</h3>
     <form method="post" class="grid-form priority-sale-form" autocomplete="off">
@@ -66,6 +69,7 @@
     </form>
   </section>
 
+  <!-- Lista expansível das contas compartilhadas em aberto que impactam a loja. -->
   <section class="card">
     <button type="button" class="payables-section-toggle" data-toggle-panel="store-payables-panel" aria-expanded="false">
       <span class="payables-section-copy">
@@ -97,6 +101,7 @@
     </div>
   </section>
 
+  <!-- Lista expansível das despesas do mês já rateadas para esta loja. -->
   <section class="card">
     <button type="button" class="payables-section-toggle" data-toggle-panel="store-expenses-panel" aria-expanded="false">
       <span class="payables-section-copy">
@@ -136,6 +141,7 @@
     </div>
   </section>
 
+  <!-- Tabela com o consolidado diário do mês selecionado. -->
   <section class="card">
     <h3>Resumo por dia trabalhado</h3>
     {% if data.day_rows %}
@@ -164,6 +170,7 @@
     {% endif %}
   </section>
 
+  <!-- Histórico recente de vendas com ações para edição e exclusão. -->
   <section class="card">
     <h3>Últimas Vendas Lançadas</h3>
     {% if recent_sales %}
@@ -190,6 +197,7 @@
                 </form>
               </td>
             </tr>
+            <!-- Modal de edição associado a cada venda listada acima. -->
             <dialog id="sale-dialog-{{ sale.id }}" class="payable-dialog">
               <form method="dialog" class="dialog-close-row">
                 <button type="submit" class="dialog-close">Fechar</button>
@@ -221,6 +229,7 @@
 
   <script>
     (function () {
+      // Controla a abertura do bloco de indicadores mensais da loja.
       const btn = document.getElementById("month-data-toggle");
       const panel = document.getElementById("month-data-panel");
       if (btn && panel) {
@@ -231,6 +240,7 @@
         });
       }
 
+      // Reaproveita o padrão de acordeão nas seções expansíveis da página.
       const toggles = document.querySelectorAll("[data-toggle-panel]");
       toggles.forEach(function (toggle) {
         toggle.addEventListener("click", function () {
@@ -245,6 +255,7 @@
         });
       });
 
+      // Abre os modais de edição e ajusta o scroll do body enquanto houver diálogo aberto.
       const buttons = document.querySelectorAll("[data-dialog-id]");
       const setBodyScroll = function () {
         const hasOpenDialog = document.querySelector("dialog[open]");

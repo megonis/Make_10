@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+  <!-- Filtro do mês que controla a listagem e os formulários da tela de saídas. -->
   <section class="card">
     <h2>Saidas</h2>
     <form method="get" class="inline-form" autocomplete="off">
@@ -9,6 +10,7 @@
     </form>
   </section>
 
+  <!-- Painel expansível com todas as saídas cadastradas para o mês selecionado. -->
   <section class="card">
     <button type="button" class="payables-section-toggle" data-toggle-panel="outflows-panel" aria-expanded="false">
       <span class="payables-section-copy">
@@ -23,6 +25,7 @@
         <div class="payables-grid">
           {% for outflow in outflows %}
             {% set count = outflow.stores|length %}
+            <!-- Cada cartão resume uma saída e abre o modal completo de edição. -->
             <button type="button" class="payable-card" data-dialog-id="outflow-dialog-{{ outflow.id }}">
               <div class="payable-card-top">
                 <strong>{{ outflow.description }}</strong>
@@ -60,6 +63,7 @@
               </div>
             </button>
 
+            <!-- Modal de edição e exclusão vinculado a cada saída listada. -->
             <dialog id="outflow-dialog-{{ outflow.id }}" class="payable-dialog">
               <form method="dialog" class="dialog-close-row">
                 <button type="submit" class="dialog-close">Fechar</button>
@@ -129,6 +133,7 @@
     </div>
   </section>
 
+  <!-- Formulário de cadastro de nova saída compartilhada entre lojas. -->
   <section class="card subtle-card">
     <h3>Adicionar Saida</h3>
     <form method="post" class="grid-form payable-form" autocomplete="off">
@@ -177,11 +182,13 @@
 
   <script>
     (function () {
+      // Usa o mês como parte da chave para persistir estado por período analisado.
       const monthInput = document.getElementById("month");
       const monthToken = monthInput ? monthInput.value : "default";
       const storageKeyBase = "outflows-ui:" + monthToken;
       const scrollKey = storageKeyBase + ":scrollY";
       const panelKey = storageKeyBase + ":outflowsPanelOpen";
+      // Controle de expansão do acordeão principal de saídas.
       const toggles = document.querySelectorAll("[data-toggle-panel]");
       toggles.forEach(function (toggle) {
         toggle.addEventListener("click", function () {
@@ -199,6 +206,7 @@
         });
       });
 
+      // Restaura a abertura do painel após submissões que recarregam a página.
       const outflowsPanel = document.getElementById("outflows-panel");
       const outflowsToggle = document.querySelector('[data-toggle-panel="outflows-panel"]');
       if (outflowsPanel && outflowsToggle && sessionStorage.getItem(panelKey) === "true") {
@@ -206,6 +214,7 @@
         outflowsToggle.setAttribute("aria-expanded", "true");
       }
 
+      // Gerencia os modais de edição e o bloqueio de scroll do body.
       const buttons = document.querySelectorAll("[data-dialog-id]");
       const setBodyScroll = function () {
         const hasOpenDialog = document.querySelector("dialog[open]");
@@ -228,6 +237,7 @@
         dialog.addEventListener("cancel", setBodyScroll);
       });
 
+      // Salva posição da tela antes de submissões para manter contexto do usuário.
       const persistViewport = function () {
         sessionStorage.setItem(scrollKey, String(window.scrollY || window.pageYOffset || 0));
         sessionStorage.setItem(panelKey, "true");
@@ -238,6 +248,7 @@
         form.addEventListener("submit", persistViewport);
       });
 
+      // Reposiciona a página após o reload usando o scroll persistido.
       const savedScroll = sessionStorage.getItem(scrollKey);
       if (savedScroll !== null) {
         sessionStorage.removeItem(scrollKey);

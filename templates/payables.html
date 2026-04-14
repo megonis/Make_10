@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
+  <!-- Separações derivadas da lista original para facilitar a renderização por status. -->
   {% set open_payables = payables | rejectattr("is_paid") | list %}
   {% set paid_payables = payables | selectattr("is_paid") | list %}
   {% set overdue_payables = open_payables | selectattr("due_date", "lt", today) | list %}
   {% set upcoming_payables = open_payables | rejectattr("due_date", "lt", today) | list %}
 
+  <!-- Macro reutilizada para exibir cartões e modais de edição das contas. -->
   {% macro render_payable_cards(items) %}
     <div class="payables-grid">
       {% for payable in items %}
@@ -112,6 +114,7 @@
     </div>
   {% endmacro %}
 
+  <!-- Filtro do mês de análise usado em toda a tela de contas a pagar. -->
   <section class="card">
     <h2>Contas a Pagar</h2>
     <form method="get" class="inline-form" autocomplete="off">
@@ -121,6 +124,7 @@
     </form>
   </section>
 
+  <!-- Acordeão das contas ainda em aberto, incluindo vencidas. -->
   <section class="card">
     <button type="button" class="payables-section-toggle" data-toggle-panel="open-payables-panel" aria-expanded="false">
       <span class="payables-section-copy">
@@ -142,6 +146,7 @@
     </div>
   </section>
 
+  <!-- Acordeão das contas já marcadas como pagas. -->
   <section class="card">
     <button type="button" class="payables-section-toggle" data-toggle-panel="paid-payables-panel" aria-expanded="false">
       <span class="payables-section-copy">
@@ -159,6 +164,7 @@
     </div>
   </section>
 
+  <!-- Formulário de cadastro de uma nova conta para rateio entre lojas. -->
   <section class="card subtle-card">
     <h3>Adicionar Conta a Pagar</h3>
     <form method="post" class="grid-form payable-form" autocomplete="off">
@@ -204,6 +210,7 @@
 
   <script>
     (function () {
+      // Controle genérico dos painéis expansíveis da página.
       const toggles = document.querySelectorAll("[data-toggle-panel]");
       toggles.forEach(function (toggle) {
         toggle.addEventListener("click", function () {
@@ -218,6 +225,7 @@
         });
       });
 
+      // Gerencia os modais de edição e evita rolagem do fundo ao abrir um diálogo.
       const buttons = document.querySelectorAll("[data-dialog-id]");
       const setBodyScroll = function () {
         const hasOpenDialog = document.querySelector("dialog[open]");

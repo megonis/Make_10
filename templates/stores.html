@@ -1,5 +1,6 @@
 ﻿{% extends "base.html" %}
 {% block content %}
+  <!-- Lista das lojas já cadastradas com acesso rápido ao painel individual. -->
   <section class="card">
     <h2>Lojas Cadastradas</h2>
     {% if stores %}
@@ -22,6 +23,7 @@
     {% endif %}
   </section>
 
+  <!-- Formulário simples para cadastro de uma nova loja no sistema. -->
   <section class="card subtle-card">
     <h2>Cadastrar Loja</h2>
     <form method="post" class="grid-form" autocomplete="off">

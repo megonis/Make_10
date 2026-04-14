@@ -1,15 +1,22 @@
 ﻿{% extends "base.html" %}
 {% block content %}
+  <!-- Bloco principal do resumo com filtros por período e KPIs consolidados. -->
   <section class="card">
     <h2>Resumo Geral</h2>
-    <form method="get" class="inline-form">
-      <label for="date_from">Data inicial</label>
-      <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
-      <label for="date_to">Data final</label>
-      <input id="date_to" name="date_to" type="date" value="{{ date_to_value }}" />
-      <button type="submit">Atualizar</button>
+    <!-- Filtro por intervalo de datas para recalcular os indicadores da página. -->
+    <form method="get" class="summary-filter-form">
+      <label for="date_from" class="summary-filter-field">
+        <span>Data inicial</span>
+        <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
+      </label>
+      <label for="date_to" class="summary-filter-field">
+        <span>Data final</span>
+        <input id="date_to" name="date_to" type="date" value="{{ date_to_value }}" />
+      </label>
+      <button type="submit" class="summary-filter-button">Atualizar</button>
     </form>
-    <div class="kpi-grid">
+    <!-- Grade responsiva dos indicadores financeiros gerais. -->
+    <div class="kpi-grid summary-kpi-grid">
       <article class="kpi">
         <small>Vendas totais</small>
         <strong>{{ money(total_sales) }}</strong>
@@ -37,6 +44,7 @@
     </div>
   </section>
 
+  <!-- Tabela com o resumo por loja; cada linha leva para o detalhe da loja. -->
   <section class="card">
     <h2>Lojas</h2>
     {% if metrics %}
@@ -80,6 +88,7 @@
   </section>
   <script>
     (function () {
+      // Transforma as linhas da tabela em links clicáveis via mouse e teclado.
       const rows = document.querySelectorAll(".summary-row-link");
       rows.forEach(function (row) {
         const href = row.getAttribute("data-href");
