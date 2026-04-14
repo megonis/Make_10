@@ -46,9 +46,10 @@
               aria-expanded="false"
               aria-label="Abrir menu"
             >
-              <span></span>
-              <span></span>
-              <span></span>
+              <span class="mobile-nav-toggle-inner">
+                <span></span>
+                <span></span>
+              </span>
             </button>
             <a href="{{ url_for('index') }}" class="mobile-topbar-title">Painel Financeiro</a>
           </div>
@@ -85,8 +86,16 @@
           const sidebar = document.getElementById("app-sidebar");
           const toggle = document.querySelector(".mobile-nav-toggle");
           const backdrop = document.querySelector(".sidebar-backdrop");
+          const closeOpenDropdowns = function (event) {
+            document.querySelectorAll(".store-filter-dropdown[open]").forEach(function (dropdown) {
+              if (!dropdown.contains(event.target)) {
+                dropdown.removeAttribute("open");
+              }
+            });
+          };
 
           if (!sidebar || !toggle || !backdrop) {
+            document.addEventListener("click", closeOpenDropdowns);
             return;
           }
 
@@ -123,6 +132,8 @@
               setOpen(false);
             }
           });
+
+          document.addEventListener("click", closeOpenDropdowns);
         })();
       </script>
     {% endif %}

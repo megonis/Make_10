@@ -762,6 +762,8 @@ body.modal-open {
 
 .summary-filter-field input {
   min-height: 44px;
+  width: 100%;
+  min-width: 0;
 }
 
 .summary-filter-button {
@@ -1155,21 +1157,26 @@ td {
   }
 
   .mobile-nav-toggle {
-    width: 42px;
-    height: 42px;
+    width: 38px;
+    height: 38px;
     padding: 0;
-    display: inline-grid;
-    place-items: center;
-    gap: 4px;
-    border-radius: 12px;
-    background: rgba(15, 28, 49, 0.92);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(15, 28, 49, 0.8);
   }
 
-  .mobile-nav-toggle span {
-    width: 18px;
+  .mobile-nav-toggle-inner {
+    display: grid;
+    gap: 5px;
+  }
+
+  .mobile-nav-toggle-inner span {
+    width: 14px;
     height: 2px;
     border-radius: 999px;
-    background: #e5eefc;
+    background: #dbe7f7;
     display: block;
   }
 
@@ -1193,6 +1200,18 @@ td {
 
   .summary-filter-form {
     grid-template-columns: 1fr;
+  }
+
+  .summary-filter-field,
+  .summary-store-filter {
+    min-width: 0;
+  }
+
+  .summary-filter-field input,
+  .summary-filter-field select,
+  .store-filter-summary {
+    width: 100%;
+    min-width: 0;
   }
 
   .store-filter-panel {
@@ -1296,6 +1315,37 @@ td {
 
   .payable-form {
     grid-template-columns: 1fr;
+  }
+
+  .compact-entry-form {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "stores"
+      "description"
+      "total"
+      "date"
+      "type"
+      "category"
+      "notes"
+      "submit";
+    justify-content: stretch;
+  }
+
+  .compact-entry-form .entry-form-field,
+  .compact-entry-form .store-assignment-group,
+  .compact-entry-form button[type="submit"],
+  .compact-entry-form.payable-form .store-assignment-group,
+  .compact-entry-form.payable-form button[type="submit"] {
+    grid-column: auto;
+    grid-row: auto;
+    max-width: none;
+    width: 100%;
+  }
+
+  .compact-entry-form button[type="submit"],
+  .compact-entry-form.payable-form button[type="submit"] {
+    justify-self: stretch;
+    min-width: 0;
   }
 
   .payable-item {
