@@ -69,16 +69,13 @@ body.modal-open {
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-.sidebar-brand-mark {
+.sidebar-brand-avatar {
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
-  color: #fff;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  object-fit: cover;
+  display: block;
+  border: 1px solid rgba(94, 234, 212, 0.24);
   box-shadow: 0 12px 24px rgba(20, 184, 166, 0.2);
 }
 
