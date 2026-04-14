@@ -159,6 +159,11 @@
 
   <script>
     (function () {
+      const monthInput = document.getElementById("month");
+      const monthToken = monthInput ? monthInput.value : "default";
+      const storageKeyBase = "outflows-ui:" + monthToken;
+      const scrollKey = storageKeyBase + ":scrollY";
+      const panelKey = storageKeyBase + ":outflowsPanelOpen";
       const toggles = document.querySelectorAll("[data-toggle-panel]");
       toggles.forEach(function (toggle) {
         toggle.addEventListener("click", function () {
@@ -170,8 +175,18 @@
           const willExpand = panel.hasAttribute("hidden");
           panel.toggleAttribute("hidden");
           toggle.setAttribute("aria-expanded", String(willExpand));
+          if (panel.id === "outflows-panel") {
+            sessionStorage.setItem(panelKey, willExpand ? "true" : "false");
+          }
         });
       });
+
+      const outflowsPanel = document.getElementById("outflows-panel");
+      const outflowsToggle = document.querySelector('[data-toggle-panel="outflows-panel"]');
+      if (outflowsPanel && outflowsToggle && sessionStorage.getItem(panelKey) === "true") {
+        outflowsPanel.removeAttribute("hidden");
+        outflowsToggle.setAttribute("aria-expanded", "true");
+      }
 
       const buttons = document.querySelectorAll("[data-dialog-id]");
       const setBodyScroll = function () {
@@ -194,6 +209,24 @@
         dialog.addEventListener("close", setBodyScroll);
         dialog.addEventListener("cancel", setBodyScroll);
       });
+
+      const persistViewport = function () {
+        sessionStorage.setItem(scrollKey, String(window.scrollY || window.pageYOffset || 0));
+        sessionStorage.setItem(panelKey, "true");
+      };
+
+      const forms = document.querySelectorAll('form[action*="/outflows/"]');
+      forms.forEach(function (form) {
+        form.addEventListener("submit", persistViewport);
+      });
+
+      const savedScroll = sessionStorage.getItem(scrollKey);
+      if (savedScroll !== null) {
+        sessionStorage.removeItem(scrollKey);
+        window.requestAnimationFrame(function () {
+          window.scrollTo({ top: Number(savedScroll), behavior: "auto" });
+        });
+      }
     })();
   </script>
 {% endblock %}
