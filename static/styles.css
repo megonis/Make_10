@@ -451,6 +451,37 @@ body.modal-open {
   border: 1px solid var(--border);
 }
 
+.secondary-button {
+  background: #e2e8f0;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+.danger-button {
+  background: #dc2626;
+  color: #fff;
+}
+
+.danger-form {
+  margin-top: 12px;
+}
+
+.inline-danger-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.sales-actions-cell {
+  white-space: nowrap;
+}
+
+.sales-actions-cell,
+.sales-actions-cell form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .dialog-header {
   display: flex;
   align-items: center;
@@ -518,11 +549,13 @@ body.modal-open {
 }
 
 input,
+select,
 button {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
   font: inherit;
+  background: #fff;
 }
 
 button {
@@ -762,14 +795,22 @@ td {
     display: none;
   }
 
+  .sales-table thead {
+    display: none;
+  }
+
   .payables-table thead {
     display: none;
   }
 
   .summary-table,
+  .sales-table,
   .summary-table tbody,
+  .sales-table tbody,
   .summary-table tr,
+  .sales-table tr,
   .summary-table td,
+  .sales-table td,
   .payables-table,
   .payables-table tbody,
   .payables-table tr,
@@ -779,6 +820,7 @@ td {
   }
 
   .summary-table tr,
+  .sales-table tr,
   .payables-table tr {
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -792,6 +834,7 @@ td {
   }
 
   .summary-table td,
+  .sales-table td,
   .payables-table td {
     border-bottom: 1px dashed var(--border);
     padding: 8px 0;
@@ -799,12 +842,14 @@ td {
   }
 
   .summary-table td:last-child,
+  .sales-table td:last-child,
   .payables-table td:last-child {
     border-bottom: 0;
     padding-bottom: 0;
   }
 
   .summary-table td::before,
+  .sales-table td::before,
   .payables-table td::before {
     content: attr(data-label);
     float: left;
@@ -822,6 +867,13 @@ td {
   .summary-table td.store-name-cell::before {
     content: "";
     display: none;
+  }
+
+  .sales-actions-cell,
+  .sales-actions-cell form {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
   .payable-form {

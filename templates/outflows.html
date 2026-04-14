@@ -46,6 +46,10 @@
                   <span>{{ outflow.category or "-" }}</span>
                 </div>
                 <div>
+                  <small>Tipo</small>
+                  <span>{{ outflow_type_label(outflow.outflow_type) }}</span>
+                </div>
+                <div>
                   <small>Lojas</small>
                   <span>{{ outflow.stores | map(attribute='name') | join(', ') }}</span>
                 </div>
@@ -61,6 +65,7 @@
                 <span class="status-badge status-paid">Pago</span>
               </div>
               <form method="post" action="{{ url_for('update_outflow', outflow_id=outflow.id) }}" class="grid-form payable-form" autocomplete="off">
+                <input type="hidden" name="month" value="{{ month_token }}" />
                 <label for="description-{{ outflow.id }}">Descricao</label>
                 <input id="description-{{ outflow.id }}" name="description" value="{{ outflow.description }}" required />
 
@@ -69,6 +74,13 @@
 
                 <label for="outflow_date-{{ outflow.id }}">Data da saida</label>
                 <input id="outflow_date-{{ outflow.id }}" name="outflow_date" type="date" value="{{ outflow.outflow_date.strftime('%Y-%m-%d') }}" required />
+
+                <label for="outflow_type-{{ outflow.id }}">Tipo da saida</label>
+                <select id="outflow_type-{{ outflow.id }}" name="outflow_type" required>
+                  {% for option_value, option_label in outflow_type_choices.items() %}
+                    <option value="{{ option_value }}" {% if outflow.outflow_type == option_value %}selected{% endif %}>{{ option_label }}</option>
+                  {% endfor %}
+                </select>
 
                 <label for="category-{{ outflow.id }}">Categoria</label>
                 <input id="category-{{ outflow.id }}" name="category" value="{{ outflow.category or '' }}" placeholder="Limpeza, manutencao, compra..." />
@@ -93,6 +105,10 @@
 
                 <button type="submit">Salvar alteracoes</button>
               </form>
+              <form method="post" action="{{ url_for('delete_outflow', outflow_id=outflow.id) }}" class="danger-form" onsubmit="return confirm('Excluir esta saida?');">
+                <input type="hidden" name="month" value="{{ month_token }}" />
+                <button type="submit" class="danger-button">Excluir saida</button>
+              </form>
             </dialog>
           {% endfor %}
         </div>
@@ -113,6 +129,13 @@
 
       <label for="outflow_date">Data da saida</label>
       <input id="outflow_date" name="outflow_date" type="date" required />
+
+      <label for="outflow_type">Tipo da saida</label>
+      <select id="outflow_type" name="outflow_type" required>
+        {% for option_value, option_label in outflow_type_choices.items() %}
+          <option value="{{ option_value }}">{{ option_label }}</option>
+        {% endfor %}
+      </select>
 
       <label for="category">Categoria</label>
       <input id="category" name="category" placeholder="Opcional" />

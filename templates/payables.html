@@ -34,6 +34,10 @@
               <small>Lojas</small>
               <span>{{ payable.stores | map(attribute='name') | join(', ') }}</span>
             </div>
+            <div>
+              <small>Tipo</small>
+              <span>{{ outflow_type_label(payable.payable_type) }}</span>
+            </div>
           </div>
         </button>
 
@@ -46,6 +50,7 @@
             <span class="status-badge status-{{ status_class }}">{{ status_label }}</span>
           </div>
           <form method="post" action="{{ url_for('update_payable', payable_id=payable.id) }}" class="grid-form payable-form" autocomplete="off">
+            <input type="hidden" name="month" value="{{ month_token }}" />
             <label for="description-{{ payable.id }}">Descricao</label>
             <input id="description-{{ payable.id }}" name="description" value="{{ payable.description }}" required />
 
@@ -54,6 +59,13 @@
 
             <label for="due_date-{{ payable.id }}">Vencimento</label>
             <input id="due_date-{{ payable.id }}" name="due_date" type="date" value="{{ payable.due_date.strftime('%Y-%m-%d') }}" required />
+
+            <label for="payable_type-{{ payable.id }}">Tipo da conta</label>
+            <select id="payable_type-{{ payable.id }}" name="payable_type" required>
+              {% for option_value, option_label in payable_type_choices.items() %}
+                <option value="{{ option_value }}" {% if payable.payable_type == option_value %}selected{% endif %}>{{ option_label }}</option>
+              {% endfor %}
+            </select>
 
             <label for="notes-{{ payable.id }}">Observacao</label>
             <input id="notes-{{ payable.id }}" name="notes" value="{{ payable.notes or '' }}" />
@@ -79,6 +91,10 @@
             </div>
 
             <button type="submit">Salvar alteracoes</button>
+          </form>
+          <form method="post" action="{{ url_for('delete_payable', payable_id=payable.id) }}" class="danger-form" onsubmit="return confirm('Excluir esta conta a pagar?');">
+            <input type="hidden" name="month" value="{{ month_token }}" />
+            <button type="submit" class="danger-button">Excluir conta</button>
           </form>
         </dialog>
       {% endfor %}
@@ -143,6 +159,13 @@
 
       <label for="due_date">Vencimento</label>
       <input id="due_date" name="due_date" type="date" required />
+
+      <label for="payable_type">Tipo da conta</label>
+      <select id="payable_type" name="payable_type" required>
+        {% for option_value, option_label in payable_type_choices.items() %}
+          <option value="{{ option_value }}">{{ option_label }}</option>
+        {% endfor %}
+      </select>
 
       <label for="notes">Observacao</label>
       <input id="notes" name="notes" placeholder="Opcional" />

@@ -39,6 +39,13 @@ app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+OUTFLOW_TYPE_OPERATIONAL = "operational"
+OUTFLOW_TYPE_MERCHANDISE = "merchandise"
+OUTFLOW_TYPE_CHOICES = {
+    OUTFLOW_TYPE_OPERATIONAL: "Outra saida",
+    OUTFLOW_TYPE_MERCHANDISE: "Mercadoria",
+}
+
 account_payable_stores = db.Table(
     "account_payable_stores",
     db.Column("account_payable_id", db.Integer, db.ForeignKey("account_payable.id"), primary_key=True),
@@ -99,6 +106,7 @@ class AccountPayable(db.Model):
     description = db.Column(db.String(160), nullable=False)
     total_amount = db.Column(db.Numeric(12, 2), nullable=False)
     due_date = db.Column(db.Date, nullable=False, index=True)
+    payable_type = db.Column(db.String(20), nullable=False, default=OUTFLOW_TYPE_OPERATIONAL)
     notes = db.Column(db.String(200), nullable=True)
     is_paid = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.Date, nullable=False, default=date.today)
@@ -116,6 +124,7 @@ class CashOutflow(db.Model):
     description = db.Column(db.String(160), nullable=False)
     total_amount = db.Column(db.Numeric(12, 2), nullable=False)
     outflow_date = db.Column(db.Date, nullable=False, index=True)
+    outflow_type = db.Column(db.String(20), nullable=False, default=OUTFLOW_TYPE_OPERATIONAL)
     category = db.Column(db.String(80), nullable=True)
     notes = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.Date, nullable=False, default=date.today)
@@ -159,6 +168,17 @@ def parse_decimal_input(value: str, default: str = "0") -> Decimal:
     return Decimal(normalized)
 
 
+def normalize_outflow_type(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized == OUTFLOW_TYPE_MERCHANDISE:
+        return OUTFLOW_TYPE_MERCHANDISE
+    return OUTFLOW_TYPE_OPERATIONAL
+
+
+def outflow_type_label(value: str | None) -> str:
+    return OUTFLOW_TYPE_CHOICES.get(normalize_outflow_type(value), OUTFLOW_TYPE_CHOICES[OUTFLOW_TYPE_OPERATIONAL])
+
+
 def month_store_metrics(store: Store, year: int, month: int) -> dict:
     start = date(year, month, 1)
     end = date(year, month, monthrange(year, month)[1])
@@ -182,12 +202,22 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     )
     shared_payable_rows = []
     total_shared_month = Decimal("0.00")
+    total_open_payables_month = Decimal("0.00")
+    total_paid_payables_month = Decimal("0.00")
+    total_payable_merchandise_month = Decimal("0.00")
     for payable in shared_payables:
         store_count = len(payable.stores)
         allocated_amount = (
             payable.total_amount / Decimal(store_count) if store_count else Decimal("0.00")
         )
         total_shared_month += allocated_amount
+        payable_type = normalize_outflow_type(payable.payable_type)
+        if payable_type == OUTFLOW_TYPE_MERCHANDISE:
+            total_payable_merchandise_month += allocated_amount
+        if payable.is_paid:
+            total_paid_payables_month += allocated_amount
+        else:
+            total_open_payables_month += allocated_amount
         shared_payable_rows.append(
             {
                 "id": payable.id,
@@ -197,6 +227,8 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "total_amount": payable.total_amount,
                 "allocated_amount": allocated_amount,
                 "store_count": store_count,
+                "payable_type": payable_type,
+                "payable_type_label": outflow_type_label(payable.payable_type),
                 "is_paid": payable.is_paid,
                 "notes": payable.notes,
                 "category": "Conta a pagar",
@@ -215,18 +247,27 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     )
     cash_outflow_rows = []
     total_outflows_month = Decimal("0.00")
+    total_operational_outflows_month = Decimal("0.00")
+    total_merchandise_month = Decimal("0.00")
     for outflow in cash_outflows:
         store_count = len(outflow.stores)
         allocated_amount = (
             outflow.total_amount / Decimal(store_count) if store_count else Decimal("0.00")
         )
         total_outflows_month += allocated_amount
+        outflow_type = normalize_outflow_type(outflow.outflow_type)
+        if outflow_type == OUTFLOW_TYPE_MERCHANDISE:
+            total_merchandise_month += allocated_amount
+        else:
+            total_operational_outflows_month += allocated_amount
         cash_outflow_rows.append(
             {
                 "id": outflow.id,
                 "kind": "outflow",
                 "description": outflow.description,
                 "event_date": outflow.outflow_date,
+                "outflow_type": outflow_type,
+                "outflow_type_label": outflow_type_label(outflow.outflow_type),
                 "category": outflow.category,
                 "total_amount": outflow.total_amount,
                 "allocated_amount": allocated_amount,
@@ -242,10 +283,11 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "description": item["description"],
                 "event_date": item["event_date"],
                 "allocated_amount": item["allocated_amount"],
-                "status": "Paga" if item.get("is_paid") else "Em aberto",
-                "category": item.get("category") or "Conta a pagar",
+                "status": "Paga",
+                "category": item.get("category") or item.get("payable_type_label") or "Conta a pagar",
             }
             for item in shared_payable_rows
+            if item.get("is_paid") and item.get("payable_type") != OUTFLOW_TYPE_MERCHANDISE
         ]
         + [
             {
@@ -254,9 +296,10 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
                 "event_date": item["event_date"],
                 "allocated_amount": item["allocated_amount"],
                 "status": "Pago",
-                "category": item.get("category") or "Saida",
+                "category": item.get("category") or item.get("outflow_type_label") or "Saida",
             }
             for item in cash_outflow_rows
+            if item.get("outflow_type") != OUTFLOW_TYPE_MERCHANDISE
         ],
         key=lambda item: (item["event_date"], item["description"].lower()),
         reverse=True,
@@ -270,6 +313,9 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     total_sales_month = sum((s.amount for s in sales), Decimal("0.00"))
 
     workdays = workdays_monday_to_saturday(year, month)
+    total_expense_bucket_month = (
+        total_paid_payables_month - total_payable_merchandise_month + total_operational_outflows_month
+    )
     total_expenses_month = total_fixed_month + total_shared_month + total_outflows_month
     fixed_per_day = total_expenses_month / Decimal(len(workdays)) if workdays else Decimal("0.00")
 
@@ -292,7 +338,12 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
     return {
         "total_fixed_month": total_fixed_month,
         "total_shared_payables_month": total_shared_month,
+        "total_open_payables_month": total_open_payables_month,
+        "total_paid_payables_month": total_paid_payables_month,
         "total_outflows_month": total_outflows_month,
+        "total_operational_outflows_month": total_operational_outflows_month,
+        "total_merchandise_month": total_merchandise_month + total_payable_merchandise_month,
+        "total_expense_bucket_month": total_expense_bucket_month,
         "total_expenses_month": total_expenses_month,
         "total_sales_month": total_sales_month,
         "fixed_per_day": fixed_per_day,
@@ -301,6 +352,7 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
         "day_rows": day_rows,
         "expenses": expenses,
         "shared_payables": shared_payable_rows,
+        "open_shared_payables": [item for item in shared_payable_rows if not item.get("is_paid")],
         "cash_outflows": cash_outflow_rows,
         "month_expense_items": month_expense_items,
     }
@@ -308,7 +360,11 @@ def month_store_metrics(store: Store, year: int, month: int) -> dict:
 
 @app.context_processor
 def inject_helpers():
-    return {"money": money, "is_authenticated": is_authenticated()}
+    return {
+        "money": money,
+        "is_authenticated": is_authenticated(),
+        "outflow_type_label": outflow_type_label,
+    }
 
 
 @app.before_request
@@ -354,6 +410,16 @@ def index():
         (m["data"]["total_shared_payables_month"] for m in metrics), Decimal("0.00")
     )
     total_outflows = sum((m["data"]["total_outflows_month"] for m in metrics), Decimal("0.00"))
+    total_operational_outflows = sum(
+        (m["data"]["total_operational_outflows_month"] for m in metrics), Decimal("0.00")
+    )
+    total_paid_payables = sum(
+        (m["data"]["total_paid_payables_month"] for m in metrics), Decimal("0.00")
+    )
+    total_merchandise = sum(
+        (m["data"]["total_merchandise_month"] for m in metrics), Decimal("0.00")
+    )
+    total_expense_bucket = total_paid_payables + total_operational_outflows
     total_expenses = total_fixed + total_shared_payables + total_outflows
 
     return render_template(
@@ -364,6 +430,10 @@ def index():
         total_fixed=total_fixed,
         total_shared_payables=total_shared_payables,
         total_outflows=total_outflows,
+        total_operational_outflows=total_operational_outflows,
+        total_paid_payables=total_paid_payables,
+        total_expense_bucket=total_expense_bucket,
+        total_merchandise=total_merchandise,
         total_expenses=total_expenses,
         total_result=total_sales - total_expenses,
     )
@@ -398,6 +468,7 @@ def payables():
         description = request.form.get("description", "").strip()
         total_amount_raw = request.form.get("total_amount", "0")
         due_date_raw = request.form.get("due_date")
+        payable_type = normalize_outflow_type(request.form.get("payable_type"))
         notes = request.form.get("notes", "").strip() or None
         selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
 
@@ -417,6 +488,7 @@ def payables():
                     description=description,
                     total_amount=parse_decimal_input(total_amount_raw),
                     due_date=due_date_value,
+                    payable_type=payable_type,
                     notes=notes,
                     stores=selected_stores,
                 )
@@ -449,33 +521,37 @@ def payables():
         payables=payable_items,
         month_token=month_token,
         today=date.today(),
+        payable_type_choices=OUTFLOW_TYPE_CHOICES,
     )
 
 
 @app.route("/payables/<int:payable_id>/update", methods=["POST"])
 def update_payable(payable_id: int):
     payable = AccountPayable.query.get_or_404(payable_id)
+    month_token = request.form.get("month") or payable.due_date.strftime("%Y-%m")
     description = request.form.get("description", "").strip()
     total_amount_raw = request.form.get("total_amount", "0")
     due_date_raw = request.form.get("due_date")
+    payable_type = normalize_outflow_type(request.form.get("payable_type"))
     notes = request.form.get("notes", "").strip() or None
     selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
     is_paid = request.form.get("is_paid") == "on"
 
     if not description or not due_date_raw or not selected_store_ids:
         flash("Preencha descricao, vencimento e selecione ao menos uma loja.", "error")
-        return redirect(url_for("payables"))
+        return redirect(url_for("payables", month=month_token))
 
     try:
         due_date_value = datetime.strptime(due_date_raw, "%Y-%m-%d").date()
         selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
         if not selected_stores:
             flash("Nenhuma loja valida foi selecionada.", "error")
-            return redirect(url_for("payables"))
+            return redirect(url_for("payables", month=month_token))
 
         payable.description = description
         payable.total_amount = parse_decimal_input(total_amount_raw)
         payable.due_date = due_date_value
+        payable.payable_type = payable_type
         payable.notes = notes
         payable.is_paid = is_paid
         payable.stores = selected_stores
@@ -486,7 +562,24 @@ def update_payable(payable_id: int):
         app.logger.exception("Erro ao atualizar conta a pagar.")
         flash("Nao foi possivel atualizar a conta a pagar.", "error")
 
-    return redirect(url_for("payables"))
+    return redirect(url_for("payables", month=month_token))
+
+
+@app.route("/payables/<int:payable_id>/delete", methods=["POST"])
+def delete_payable(payable_id: int):
+    payable = AccountPayable.query.get_or_404(payable_id)
+    month_token = request.form.get("month") or payable.due_date.strftime("%Y-%m")
+
+    try:
+        db.session.delete(payable)
+        db.session.commit()
+        flash("Conta a pagar excluida com sucesso.", "success")
+    except SQLAlchemyError:
+        db.session.rollback()
+        app.logger.exception("Erro ao excluir conta a pagar.")
+        flash("Nao foi possivel excluir a conta a pagar.", "error")
+
+    return redirect(url_for("payables", month=month_token))
 
 
 @app.route("/outflows", methods=["GET", "POST"])
@@ -496,6 +589,7 @@ def outflows():
         description = request.form.get("description", "").strip()
         total_amount_raw = request.form.get("total_amount", "0")
         outflow_date_raw = request.form.get("outflow_date")
+        outflow_type = normalize_outflow_type(request.form.get("outflow_type"))
         category = request.form.get("category", "").strip() or None
         notes = request.form.get("notes", "").strip() or None
         selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
@@ -516,6 +610,7 @@ def outflows():
                     description=description,
                     total_amount=parse_decimal_input(total_amount_raw),
                     outflow_date=outflow_date_value,
+                    outflow_type=outflow_type,
                     category=category,
                     notes=notes,
                     stores=selected_stores,
@@ -548,33 +643,37 @@ def outflows():
         stores=stores,
         outflows=outflow_items,
         month_token=month_token,
+        outflow_type_choices=OUTFLOW_TYPE_CHOICES,
     )
 
 
 @app.route("/outflows/<int:outflow_id>/update", methods=["POST"])
 def update_outflow(outflow_id: int):
     outflow = CashOutflow.query.get_or_404(outflow_id)
+    month_token = request.form.get("month") or outflow.outflow_date.strftime("%Y-%m")
     description = request.form.get("description", "").strip()
     total_amount_raw = request.form.get("total_amount", "0")
     outflow_date_raw = request.form.get("outflow_date")
+    outflow_type = normalize_outflow_type(request.form.get("outflow_type"))
     category = request.form.get("category", "").strip() or None
     notes = request.form.get("notes", "").strip() or None
     selected_store_ids = [int(value) for value in request.form.getlist("store_ids")]
 
     if not description or not outflow_date_raw or not selected_store_ids:
         flash("Preencha descricao, data e selecione ao menos uma loja.", "error")
-        return redirect(url_for("outflows"))
+        return redirect(url_for("outflows", month=month_token))
 
     try:
         outflow_date_value = datetime.strptime(outflow_date_raw, "%Y-%m-%d").date()
         selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
         if not selected_stores:
             flash("Nenhuma loja valida foi selecionada.", "error")
-            return redirect(url_for("outflows"))
+            return redirect(url_for("outflows", month=month_token))
 
         outflow.description = description
         outflow.total_amount = parse_decimal_input(total_amount_raw)
         outflow.outflow_date = outflow_date_value
+        outflow.outflow_type = outflow_type
         outflow.category = category
         outflow.notes = notes
         outflow.stores = selected_stores
@@ -585,7 +684,24 @@ def update_outflow(outflow_id: int):
         app.logger.exception("Erro ao atualizar saida.")
         flash("Nao foi possivel atualizar a saida.", "error")
 
-    return redirect(url_for("outflows"))
+    return redirect(url_for("outflows", month=month_token))
+
+
+@app.route("/outflows/<int:outflow_id>/delete", methods=["POST"])
+def delete_outflow(outflow_id: int):
+    outflow = CashOutflow.query.get_or_404(outflow_id)
+    month_token = request.form.get("month") or outflow.outflow_date.strftime("%Y-%m")
+
+    try:
+        db.session.delete(outflow)
+        db.session.commit()
+        flash("Saida excluida com sucesso.", "success")
+    except SQLAlchemyError:
+        db.session.rollback()
+        app.logger.exception("Erro ao excluir saida.")
+        flash("Nao foi possivel excluir a saida.", "error")
+
+    return redirect(url_for("outflows", month=month_token))
 
 
 @app.route("/stores", methods=["GET", "POST"])
@@ -607,6 +723,51 @@ def stores():
                 flash("Ja existe uma loja com esse nome.", "error")
         return redirect(url_for("stores"))
     return render_template("stores.html", stores=Store.query.order_by(Store.name).all())
+
+
+@app.route("/stores/<int:store_id>/sales/<int:sale_id>/update", methods=["POST"])
+def update_sale(store_id: int, sale_id: int):
+    store = Store.query.get_or_404(store_id)
+    sale = DailySale.query.filter_by(id=sale_id, store_id=store.id).first_or_404()
+    month_token = request.form.get("month") or sale.sale_date.strftime("%Y-%m")
+    sale_date_raw = request.form.get("sale_date")
+    amount_raw = request.form.get("amount", "0")
+    notes = request.form.get("notes", "").strip() or None
+
+    if not sale_date_raw:
+        flash("Informe a data da venda.", "error")
+        return redirect(url_for("store_detail", store_id=store.id, month=month_token))
+
+    try:
+        sale.sale_date = datetime.strptime(sale_date_raw, "%Y-%m-%d").date()
+        sale.amount = parse_decimal_input(amount_raw)
+        sale.notes = notes
+        db.session.commit()
+        flash("Venda diaria atualizada com sucesso.", "success")
+    except (ArithmeticError, ValueError, SQLAlchemyError):
+        db.session.rollback()
+        app.logger.exception("Erro ao atualizar venda diaria.")
+        flash("Nao foi possivel atualizar a venda diaria.", "error")
+
+    return redirect(url_for("store_detail", store_id=store.id, month=month_token))
+
+
+@app.route("/stores/<int:store_id>/sales/<int:sale_id>/delete", methods=["POST"])
+def delete_sale(store_id: int, sale_id: int):
+    store = Store.query.get_or_404(store_id)
+    sale = DailySale.query.filter_by(id=sale_id, store_id=store.id).first_or_404()
+    month_token = request.form.get("month") or sale.sale_date.strftime("%Y-%m")
+
+    try:
+        db.session.delete(sale)
+        db.session.commit()
+        flash("Venda diaria excluida com sucesso.", "success")
+    except SQLAlchemyError:
+        db.session.rollback()
+        app.logger.exception("Erro ao excluir venda diaria.")
+        flash("Nao foi possivel excluir a venda diaria.", "error")
+
+    return redirect(url_for("store_detail", store_id=store.id, month=month_token))
 
 
 @app.route("/stores/<int:store_id>", methods=["GET", "POST"])
