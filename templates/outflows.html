@@ -2,7 +2,10 @@
 {% block content %}
   <!-- Filtro do mês que controla a listagem e os formulários da tela de saídas. -->
   <section class="card">
-    <h2>Saidas</h2>
+    <div class="section-title-row">
+      <h2>Saidas</h2>
+      <button type="button" class="add-entry-button" data-dialog-id="new-outflow-dialog">Adicionar saida</button>
+    </div>
     <form method="get" class="summary-filter-form" autocomplete="off">
       <label for="date_from" class="summary-filter-field">
         <span>Data inicial</span>
@@ -190,8 +193,13 @@
   </section>
 
   <!-- Formulário de cadastro de nova saída compartilhada entre lojas. -->
-  <section class="card subtle-card">
-    <h3>Adicionar Saida</h3>
+  <dialog id="new-outflow-dialog" class="payable-dialog entry-dialog">
+    <form method="dialog" class="dialog-close-row">
+      <button type="submit" class="dialog-close">Fechar</button>
+    </form>
+    <div class="dialog-header">
+      <h3>Adicionar Saida</h3>
+    </div>
     <form method="post" class="grid-form payable-form compact-entry-form" autocomplete="off">
       <label for="description" class="entry-form-field entry-field-description">
         <span>Descricao</span>
@@ -257,7 +265,7 @@
 
       <button type="submit">Salvar saida</button>
     </form>
-  </section>
+  </dialog>
 
   <script>
     (function () {

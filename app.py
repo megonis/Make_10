@@ -783,10 +783,12 @@ def payables():
             .distinct()
         )
     payable_items = payable_query.order_by(AccountPayable.due_date.asc(), AccountPayable.id.desc()).all()
+    total_payables_amount = sum((payable.total_amount for payable in payable_items), Decimal("0.00"))
     return render_template(
         "payables.html",
         stores=stores,
         payables=payable_items,
+        total_payables_amount=total_payables_amount,
         month_token=month_token,
         date_from_value=selected_start.strftime("%Y-%m-%d"),
         date_to_value=selected_end.strftime("%Y-%m-%d"),

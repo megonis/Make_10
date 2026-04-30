@@ -341,6 +341,24 @@ body.modal-open {
   color: #d7e5f7;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-title-row h2 {
+  margin: 0;
+}
+
+.add-entry-button {
+  min-height: 42px;
+  padding-inline: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .subtle-card button {
   background: #334155;
 }
@@ -516,6 +534,148 @@ body.modal-open {
   gap: 12px;
 }
 
+.payables-date-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.payables-date-group {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(16, 31, 54, 0.86);
+}
+
+.payables-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.16), rgba(15, 28, 49, 0.96));
+}
+
+.payables-date-copy,
+.payables-date-summary {
+  display: grid;
+  gap: 2px;
+}
+
+.payables-date-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.payables-date-main {
+  color: #ecfdfb;
+  font-size: 1.18rem;
+  line-height: 1.2;
+}
+
+.payables-date-summary {
+  justify-items: end;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.payables-date-summary strong {
+  color: #5eead4;
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.payables-table {
+  table-layout: fixed;
+}
+
+.payables-table th {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.payables-table th:first-child,
+.payables-table-date {
+  width: 170px;
+}
+
+.payables-table th:nth-child(2),
+.payables-table-amount {
+  width: 170px;
+}
+
+.payables-table-row {
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    outline-color 0.2s ease;
+}
+
+.payables-table-row td {
+  transition: background-color 0.2s ease;
+}
+
+.payables-table-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.payables-table-date,
+.payables-table-amount {
+  font-size: 1.02rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.payables-table-date {
+  color: #dffcf8;
+}
+
+.payables-table-amount {
+  color: #5eead4;
+}
+
+.payable-description-main {
+  color: #edf5ff;
+  font-weight: 700;
+}
+
+.status-row-overdue .payables-table-date {
+  color: #fecaca;
+}
+
+.payables-period-total {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 12px;
+  background: rgba(20, 184, 166, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.payables-period-total span,
+.payables-period-total strong {
+  display: block;
+}
+
+.payables-period-total span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.payables-period-total strong {
+  color: #5eead4;
+  font-size: 1.28rem;
+  line-height: 1.2;
+  text-align: right;
+}
+
 .payables-section-toggle {
   width: 100%;
   display: flex;
@@ -645,12 +805,68 @@ body.modal-open {
 
 .payable-dialog {
   width: min(680px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
   padding: 20px;
   border: 0;
   border-radius: 18px;
   background: #081423;
   color: var(--text);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 30px 80px rgba(2, 8, 23, 0.64);
+}
+
+.entry-dialog {
+  width: min(860px, calc(100vw - 24px));
+}
+
+.entry-dialog .compact-entry-form {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(220px, 0.9fr);
+  grid-template-areas:
+    "description total stores"
+    "date type stores"
+    "category notes stores"
+    "submit submit submit";
+}
+
+.entry-dialog .compact-entry-form .store-assignment-group,
+.entry-dialog .compact-entry-form.payable-form .store-assignment-group {
+  grid-area: stores;
+  grid-column: auto;
+  grid-row: auto;
+  max-width: none;
+  position: relative;
+  z-index: 30;
+}
+
+.entry-dialog .store-assignment-group .store-filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 90;
+  margin-top: 0;
+  max-height: 260px;
+  max-height: clamp(140px, calc(100dvh - 220px), 260px);
+  overflow: hidden;
+  box-shadow: 0 18px 40px rgba(2, 8, 23, 0.48);
+}
+
+.entry-dialog .store-filter-options {
+  max-height: 200px;
+  max-height: clamp(90px, calc(100dvh - 300px), 200px);
+  overflow-y: auto;
+}
+
+.entry-dialog .store-assignment-dropdown[open] {
+  z-index: 90;
+}
+
+.entry-dialog .compact-entry-form button[type="submit"],
+.entry-dialog .compact-entry-form.payable-form button[type="submit"] {
+  grid-area: submit;
+  grid-column: 1 / -1;
 }
 
 .payable-dialog::backdrop {
@@ -1095,6 +1311,10 @@ td {
   .subtle-card:hover {
     border-color: rgba(94, 234, 212, 0.22);
   }
+
+  .payables-table-row:hover td {
+    background: rgba(20, 184, 166, 0.08);
+  }
 }
 
 .payable-item strong,
@@ -1257,6 +1477,15 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .section-title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .add-entry-button {
+    width: 100%;
+  }
+
   .summary-filter-field,
   .summary-store-filter {
     min-width: 0;
@@ -1349,6 +1578,39 @@ td {
     font-size: 0.85rem;
   }
 
+  .payables-date-header {
+    align-items: flex-start;
+  }
+
+  .payables-date-summary {
+    justify-items: start;
+  }
+
+  .payables-table-date,
+  .payables-table-amount {
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .payables-table-description {
+    text-align: left;
+  }
+
+  .payables-table-description::before {
+    float: none;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .payables-period-total {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .payables-period-total strong {
+    text-align: left;
+  }
+
   .summary-table td.store-name-cell {
     text-align: center;
     font-size: 1.05rem;
@@ -1403,6 +1665,35 @@ td {
     min-width: 0;
   }
 
+  .entry-dialog {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+  }
+
+  .entry-dialog .compact-entry-form {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "stores"
+      "description"
+      "total"
+      "date"
+      "type"
+      "category"
+      "notes"
+      "submit";
+  }
+
+  .entry-dialog .store-assignment-group .store-filter-panel {
+    max-height: 240px;
+    max-height: clamp(130px, calc(100dvh - 210px), 240px);
+  }
+
+  .entry-dialog .store-filter-options {
+    max-height: 180px;
+    max-height: clamp(90px, calc(100dvh - 290px), 180px);
+  }
+
   .payable-item {
     flex-direction: column;
   }
@@ -1449,5 +1740,202 @@ td {
 
   .payable-dialog {
     padding: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .container {
+    padding: 10px 8px 14px;
+  }
+
+  .card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .section-title-row {
+    gap: 10px;
+  }
+
+  .section-title-row h2 {
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .add-entry-button,
+  .summary-filter-button {
+    min-height: 46px;
+  }
+
+  .summary-filter-form {
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .summary-filter-field {
+    gap: 5px;
+    font-size: 0.88rem;
+  }
+
+  .store-filter-panel {
+    padding: 10px;
+  }
+
+  .store-filter-options {
+    max-height: 190px;
+  }
+
+  .store-filter-option {
+    min-height: 38px;
+    padding: 8px;
+  }
+
+  .payables-period-total {
+    padding: 12px;
+    gap: 6px;
+  }
+
+  .payables-period-total span {
+    font-size: 0.86rem;
+  }
+
+  .payables-period-total strong {
+    font-size: 1.16rem;
+    overflow-wrap: anywhere;
+  }
+
+  .payables-section-toggle small {
+    font-size: 0.88rem;
+  }
+
+  .payables-panel {
+    margin-top: 12px;
+  }
+
+  .payables-date-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .payables-date-main {
+    font-size: 1.08rem;
+  }
+
+  .payables-date-summary {
+    justify-items: start;
+  }
+
+  .payables-table tr {
+    padding: 12px;
+  }
+
+  .payables-table td:not(.payables-table-description) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+  }
+
+  .payables-table-date,
+  .payables-table-amount {
+    font-size: 0.98rem;
+  }
+
+  .payable-card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .payable-card-body {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .payable-card-top strong,
+  .payable-description-main {
+    overflow-wrap: anywhere;
+  }
+
+  .status-badge {
+    align-self: flex-start;
+  }
+
+  .payable-dialog {
+    width: calc(100vw - 10px);
+    max-height: calc(100vh - 10px);
+    max-height: calc(100dvh - 10px);
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .dialog-close-row {
+    position: sticky;
+    top: -12px;
+    z-index: 110;
+    margin: -12px -12px 8px;
+    padding: 12px;
+    background: #081423;
+  }
+
+  .dialog-close {
+    min-height: 38px;
+  }
+
+  .dialog-header {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .dialog-header h3 {
+    font-size: 1.05rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .payable-form {
+    gap: 10px;
+  }
+
+  .entry-form-field,
+  .payable-form > label:not(.status-toggle) {
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .entry-form-field input,
+  .entry-form-field select,
+  .payable-form input,
+  .payable-form select {
+    min-height: 42px;
+  }
+
+  .payable-dialog .store-assignment-group {
+    position: relative;
+    z-index: 40;
+  }
+
+  .payable-dialog .store-assignment-group .store-filter-panel {
+    max-height: 240px;
+    max-height: clamp(130px, calc(100dvh - 220px), 240px);
+    overflow: hidden;
+  }
+
+  .payable-dialog .store-filter-options {
+    max-height: 180px;
+    max-height: clamp(90px, calc(100dvh - 300px), 180px);
+    overflow-y: auto;
+  }
+
+  .danger-form .danger-button,
+  .payable-form button[type="submit"] {
+    width: 100%;
+    min-height: 44px;
   }
 }

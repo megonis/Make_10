@@ -6,47 +6,61 @@
   {% set overdue_payables = open_payables | selectattr("due_date", "lt", today) | list %}
   {% set upcoming_payables = open_payables | rejectattr("due_date", "lt", today) | list %}
 
-  <!-- Macro reutilizada para exibir cartões e modais de edição das contas. -->
-  {% macro render_payable_cards(items) %}
-    <div class="payables-grid">
-      {% for payable in items %}
-        {% set count = payable.stores|length %}
+  <!-- Macro reutilizada para exibir tabela agrupada por data e modais de edicao. -->
+  {% macro render_payable_table(items) %}
+    <div class="payables-date-groups">
+      {% for due_date, day_payables in items | groupby("due_date") %}
+        {% set day_total = namespace(value=0) %}
+        {% for payable in day_payables %}
+          {% set day_total.value = day_total.value + payable.total_amount %}
+        {% endfor %}
+        <section class="payables-date-group">
+          <header class="payables-date-header">
+            <div class="payables-date-copy">
+              <span class="payables-date-label">Data</span>
+              <strong class="payables-date-main">{{ due_date.strftime("%d/%m/%Y") }}</strong>
+            </div>
+            <div class="payables-date-summary">
+              <span>{{ day_payables|length }} conta{{ "" if day_payables|length == 1 else "s" }}</span>
+              <strong>{{ money(day_total.value) }}</strong>
+            </div>
+          </header>
+          <table class="payables-table">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Valor</th>
+                <th scope="col">Descricao</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for payable in day_payables %}
+                {% set is_overdue = (not payable.is_paid) and payable.due_date < today %}
+                {% set status_class = "paid" if payable.is_paid else ("overdue" if is_overdue else "open") %}
+                <tr
+                  class="payables-table-row status-row-{{ status_class }}"
+                  data-dialog-id="payable-dialog-{{ payable.id }}"
+                  tabindex="0"
+                  role="button"
+                  aria-label="Editar conta {{ payable.description }}"
+                >
+                  <td data-label="Data" class="payables-table-date">{{ payable.due_date.strftime("%d/%m/%Y") }}</td>
+                  <td data-label="Valor" class="payables-table-amount">{{ money(payable.total_amount) }}</td>
+                  <td data-label="Descricao" class="payables-table-description">
+                    <span class="payable-description-main">{{ payable.description }}</span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endfor %}
+    </div>
+
+    {% for payable in items %}
         {% set is_overdue = (not payable.is_paid) and payable.due_date < today %}
         {% set status_label = "Paga" if payable.is_paid else ("Vencida" if is_overdue else "Em aberto") %}
         {% set status_class = "paid" if payable.is_paid else ("overdue" if is_overdue else "open") %}
-        <button type="button" class="payable-card" data-dialog-id="payable-dialog-{{ payable.id }}">
-          <div class="payable-card-top">
-            <strong>{{ payable.description }}</strong>
-            <span class="status-badge status-{{ status_class }}">{{ status_label }}</span>
-          </div>
-          <div class="payable-card-body">
-            <div>
-              <small>Vencimento</small>
-              <span>{{ payable.due_date.strftime("%d/%m/%Y") }}</span>
-            </div>
-            <div>
-              <small>Valor total</small>
-              <span>{{ money(payable.total_amount) }}</span>
-            </div>
-            <div>
-              <small>Valores por loja</small>
-              <span>{{ money(payable.total_amount / count if count else 0) }}</span>
-            </div>
-            <div>
-              <small>Lojas</small>
-              <span>{{ payable.stores | map(attribute='name') | join(', ') }}</span>
-            </div>
-            <div>
-              <small>Tipo</small>
-              <span>{{ entry_type_label(payable.payable_type) }}</span>
-            </div>
-            <div>
-              <small>Categoria</small>
-              <span>{{ entry_category_label(payable.category_code) }}</span>
-            </div>
-          </div>
-        </button>
-
         <dialog id="payable-dialog-{{ payable.id }}" class="payable-dialog">
           <form method="dialog" class="dialog-close-row">
             <button type="submit" class="dialog-close">Fechar</button>
@@ -133,12 +147,14 @@
           </form>
         </dialog>
       {% endfor %}
-    </div>
   {% endmacro %}
 
   <!-- Filtro do mês de análise usado em toda a tela de contas a pagar. -->
   <section class="card">
-    <h2>Contas a Pagar</h2>
+    <div class="section-title-row">
+      <h2>Contas a Pagar</h2>
+      <button type="button" class="add-entry-button" data-dialog-id="new-payable-dialog">Adicionar conta</button>
+    </div>
     <form method="get" class="summary-filter-form" autocomplete="off">
       <label for="date_from" class="summary-filter-field">
         <span>Data inicial</span>
@@ -181,6 +197,10 @@
       </div>
       <button type="submit" class="summary-filter-button">Atualizar</button>
     </form>
+    <div class="payables-period-total">
+      <span>Total de contas no periodo selecionado</span>
+      <strong>{{ money(total_payables_amount) }}</strong>
+    </div>
   </section>
 
   <!-- Acordeão das contas ainda em aberto, incluindo vencidas. -->
@@ -198,7 +218,7 @@
     </button>
     <div id="open-payables-panel" class="payables-panel" hidden>
       {% if open_payables %}
-        {{ render_payable_cards(open_payables) }}
+        {{ render_payable_table(open_payables) }}
       {% else %}
         <p class="payables-empty">Nenhuma conta em aberto para o mes selecionado.</p>
       {% endif %}
@@ -216,7 +236,7 @@
     </button>
     <div id="paid-payables-panel" class="payables-panel" hidden>
       {% if paid_payables %}
-        {{ render_payable_cards(paid_payables) }}
+        {{ render_payable_table(paid_payables) }}
       {% else %}
         <p class="payables-empty">Nenhuma conta paga para o mes selecionado.</p>
       {% endif %}
@@ -224,8 +244,13 @@
   </section>
 
   <!-- Formulário de cadastro de uma nova conta para rateio entre lojas. -->
-  <section class="card subtle-card">
-    <h3>Adicionar Conta a Pagar</h3>
+  <dialog id="new-payable-dialog" class="payable-dialog entry-dialog">
+    <form method="dialog" class="dialog-close-row">
+      <button type="submit" class="dialog-close">Fechar</button>
+    </form>
+    <div class="dialog-header">
+      <h3>Adicionar Conta a Pagar</h3>
+    </div>
     <form method="post" class="grid-form payable-form compact-entry-form" autocomplete="off">
       <label for="description" class="entry-form-field entry-field-description">
         <span>Descricao</span>
@@ -291,7 +316,7 @@
 
       <button type="submit">Salvar conta a pagar</button>
     </form>
-  </section>
+  </dialog>
 
   <script>
     (function () {
@@ -430,19 +455,32 @@
       });
 
       // Gerencia os modais de edição e evita rolagem do fundo ao abrir um diálogo.
-      const buttons = document.querySelectorAll("[data-dialog-id]");
+      const dialogTriggers = document.querySelectorAll("[data-dialog-id]");
       const setBodyScroll = function () {
         const hasOpenDialog = document.querySelector("dialog[open]");
         document.body.classList.toggle("modal-open", Boolean(hasOpenDialog));
       };
 
-      buttons.forEach(function (button) {
-        button.addEventListener("click", function () {
-          const dialog = document.getElementById(button.getAttribute("data-dialog-id"));
-          if (dialog && typeof dialog.showModal === "function") {
-            dialog.showModal();
-            setBodyScroll();
+      const openDialogFromTrigger = function (trigger) {
+        const dialog = document.getElementById(trigger.getAttribute("data-dialog-id"));
+        if (dialog && typeof dialog.showModal === "function") {
+          dialog.showModal();
+          setBodyScroll();
+        }
+      };
+
+      dialogTriggers.forEach(function (trigger) {
+        trigger.addEventListener("click", function () {
+          openDialogFromTrigger(trigger);
+        });
+
+        trigger.addEventListener("keydown", function (event) {
+          if (event.key !== "Enter" && event.key !== " ") {
+            return;
           }
+
+          event.preventDefault();
+          openDialogFromTrigger(trigger);
         });
       });
 
