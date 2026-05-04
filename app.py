@@ -74,6 +74,7 @@ ENTRY_CATEGORY_ALIASES = {
     "impostos": "imposto",
     "fornecedor": "fornecedor",
 }
+PERIOD_FILTER_SESSION_KEY = "selected_period_filter"
 
 account_payable_stores = db.Table(
     "account_payable_stores",
@@ -182,9 +183,58 @@ def parse_date_input(value: str | None) -> date | None:
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def format_date_value(value: date) -> str:
+    return value.strftime("%Y-%m-%d")
+
+
+def stored_period_filter() -> tuple[str | None, str | None]:
+    stored = session.get(PERIOD_FILTER_SESSION_KEY, {})
+    if not isinstance(stored, dict):
+        return None, None
+    return stored.get("date_from"), stored.get("date_to")
+
+
+def persist_period_filter(selected_start: date, selected_end: date) -> None:
+    session[PERIOD_FILTER_SESSION_KEY] = {
+        "date_from": format_date_value(selected_start),
+        "date_to": format_date_value(selected_end),
+    }
+
+
+def current_period_query() -> dict:
+    date_from, date_to = stored_period_filter()
+    query_args = {}
+    if date_from:
+        query_args["date_from"] = date_from
+    if date_to:
+        query_args["date_to"] = date_to
+    return query_args
+
+
+def current_period_month_token() -> str:
+    date_from, _ = stored_period_filter()
+    try:
+        selected_start = parse_date_input(date_from)
+    except ValueError:
+        selected_start = None
+    if selected_start:
+        return f"{selected_start.year:04d}-{selected_start.month:02d}"
+    today = date.today()
+    return f"{today.year:04d}-{today.month:02d}"
+
+
+def period_url_for(endpoint: str, **values) -> str:
+    query_args = current_period_query()
+    query_args.update(values)
+    return url_for(endpoint, **query_args)
+
+
 def resolve_period_filters(
     start_raw: str | None, end_raw: str | None, reference_month: str | None = None
 ) -> tuple[date, date, str]:
+    if start_raw is None and end_raw is None and reference_month is None:
+        start_raw, end_raw = stored_period_filter()
+
     year, month = parse_year_month(reference_month)
     default_start = date(year, month, 1)
     default_end = date(year, month, monthrange(year, month)[1])
@@ -201,6 +251,7 @@ def resolve_period_filters(
         selected_end = default_end
 
     month_token = f"{selected_start.year:04d}-{selected_start.month:02d}"
+    persist_period_filter(selected_start, selected_end)
     return selected_start, selected_end, month_token
 
 
@@ -267,6 +318,76 @@ def normalize_category_code(value: str | None) -> str:
     if not normalized:
         return "outros"
     return ENTRY_CATEGORY_ALIASES.get(normalized, normalized if normalized in ENTRY_CATEGORY_CHOICES else "outros")
+
+
+def resolve_entry_type_filter(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    return normalized if normalized in ENTRY_TYPE_CHOICES else ""
+
+
+def resolve_category_code_filter(value: str | None) -> str:
+    normalized = (value or "").strip().lower().replace("-", "_")
+    if not normalized:
+        return ""
+    normalized = ENTRY_CATEGORY_ALIASES.get(normalized, normalized)
+    return normalized if normalized in ENTRY_CATEGORY_CHOICES else ""
+
+
+def expense_filter_redirect_args_from_form(default_month: str | None = None) -> dict:
+    redirect_args = {}
+    date_from = request.form.get("filter_date_from", "").strip()
+    date_to = request.form.get("filter_date_to", "").strip()
+    store_ids = [value for value in request.form.getlist("filter_store_ids") if value.strip()]
+    entry_type = resolve_entry_type_filter(request.form.get("filter_entry_type"))
+    category_code = resolve_category_code_filter(request.form.get("filter_category_code"))
+    month_token = request.form.get("month") or default_month
+
+    if date_from:
+        redirect_args["date_from"] = date_from
+    if date_to:
+        redirect_args["date_to"] = date_to
+    if store_ids:
+        redirect_args["store_ids"] = store_ids
+    if entry_type:
+        redirect_args["entry_type"] = entry_type
+    if category_code:
+        redirect_args["category_code"] = category_code
+    if month_token and not date_from and not date_to:
+        redirect_args["month"] = month_token
+
+    return redirect_args
+
+
+def expense_row_matches_filters(
+    row: dict, selected_entry_type: str, selected_category_code: str
+) -> bool:
+    row_entry_type = row.get("payable_type") or row.get("outflow_type")
+    if selected_entry_type and row_entry_type != selected_entry_type:
+        return False
+    if selected_category_code and row.get("category_code") != selected_category_code:
+        return False
+    return True
+
+
+def expense_filter_label(selected_entry_type: str, selected_category_code: str) -> str:
+    labels = []
+    if selected_entry_type:
+        labels.append(entry_type_label(selected_entry_type))
+    else:
+        labels.append("Todos os tipos")
+    if selected_category_code:
+        labels.append(entry_category_label(selected_category_code))
+    else:
+        labels.append("Todas as categorias")
+    return " | ".join(labels)
+
+
+def filtered_expense_total_label(selected_entry_type: str, selected_category_code: str) -> str:
+    if selected_category_code:
+        return entry_category_label(selected_category_code)
+    if selected_entry_type:
+        return entry_type_label(selected_entry_type)
+    return "Despesas filtradas"
 
 
 def entry_type_label(value: str | None) -> str:
@@ -363,6 +484,9 @@ def build_summary_context() -> dict:
     selected_start, selected_end, month_token = resolve_period_filters(
         request.args.get("date_from"), request.args.get("date_to")
     )
+    selected_entry_type = resolve_entry_type_filter(request.args.get("entry_type"))
+    selected_category_code = resolve_category_code_filter(request.args.get("category_code"))
+    has_expense_filter = bool(selected_entry_type or selected_category_code)
 
     stores = Store.query.order_by(Store.name).all()
     selected_store_ids, filtered_stores = resolve_selected_stores(
@@ -372,6 +496,15 @@ def build_summary_context() -> dict:
     metrics = []
     for store in filtered_stores:
         data = period_store_metrics(store, selected_start, selected_end)
+        filtered_expense_total_month = sum(
+            (
+                item["allocated_amount"]
+                for item in data["shared_payables"] + data["cash_outflows"]
+                if expense_row_matches_filters(item, selected_entry_type, selected_category_code)
+            ),
+            Decimal("0.00"),
+        )
+        data["filtered_expense_total_month"] = filtered_expense_total_month
         metrics.append({"store": store, "data": data})
 
     total_sales = sum((m["data"]["total_sales_month"] for m in metrics), Decimal("0.00"))
@@ -388,6 +521,9 @@ def build_summary_context() -> dict:
     total_personal = sum((m["data"]["total_personal_month"] for m in metrics), Decimal("0.00"))
     total_merchandise = sum(
         (m["data"]["total_merchandise_month"] for m in metrics), Decimal("0.00")
+    )
+    filtered_expense_total = sum(
+        (m["data"]["filtered_expense_total_month"] for m in metrics), Decimal("0.00")
     )
     total_expense_bucket = total_paid_payables - total_personal + total_operational_outflows
     total_expenses = total_shared_payables + total_outflows
@@ -406,6 +542,15 @@ def build_summary_context() -> dict:
         "stores": stores,
         "selected_store_ids": selected_store_ids,
         "selected_store_label": selected_store_label,
+        "selected_entry_type": selected_entry_type,
+        "selected_category_code": selected_category_code,
+        "has_expense_filter": has_expense_filter,
+        "selected_expense_filter_label": expense_filter_label(
+            selected_entry_type, selected_category_code
+        ),
+        "filtered_expense_total_label": filtered_expense_total_label(
+            selected_entry_type, selected_category_code
+        ),
         "metrics": metrics,
         "total_sales": total_sales,
         "total_shared_payables": total_shared_payables,
@@ -416,7 +561,10 @@ def build_summary_context() -> dict:
         "total_expense_bucket": total_expense_bucket,
         "total_merchandise": total_merchandise,
         "total_expenses": total_expenses,
+        "filtered_expense_total": filtered_expense_total,
         "total_result": total_sales - total_expenses,
+        "entry_type_choices": ENTRY_TYPE_CHOICES,
+        "entry_category_choices": ENTRY_CATEGORY_CHOICES,
     }
 
 
@@ -625,6 +773,8 @@ def inject_helpers():
         "is_authenticated": is_authenticated(),
         "entry_type_label": entry_type_label,
         "entry_category_label": entry_category_label,
+        "period_url_for": period_url_for,
+        "current_period_month_token": current_period_month_token,
     }
 
 
@@ -665,13 +815,14 @@ def summary_pdf():
         "Resumo Geral",
         f"Periodo: {context['selected_start'].strftime('%d/%m/%Y')} ate {context['selected_end'].strftime('%d/%m/%Y')}",
         f"Lojas: {context['selected_store_label']}",
+        f"Filtro de despesas: {context['selected_expense_filter_label']}",
         "",
         f"Vendas totais: {money(context['total_sales'])}",
         f"Despesas: {money(context['total_expense_bucket'])}",
         f"Despesas pessoais: {money(context['total_personal'])}",
         f"Mercadoria no mes: {money(context['total_merchandise'])}",
         f"Total de despesas: {money(context['total_expenses'])}",
-        f"Resultado do mes: {money(context['total_result'])}",
+        f"{context['filtered_expense_total_label']}: {money(context['filtered_expense_total'])}",
         "",
         "Resumo por loja",
     ]
@@ -685,8 +836,8 @@ def summary_pdf():
                 f"  Despesas pessoais: {money(item['data']['total_personal_month'])}",
                 f"  Mercadoria: {money(item['data']['total_merchandise_month'])}",
                 f"  Total despesas: {money(item['data']['total_expenses_month'])}",
+                f"  {context['filtered_expense_total_label']}: {money(item['data']['filtered_expense_total_month'])}",
                 f"  Despesa media por dia: {money(item['data']['expense_per_day'])}",
-                f"  Resultado: {money(item['data']['month_result'])}",
                 "",
             ]
         )
@@ -739,14 +890,14 @@ def payables():
 
         if not description or not due_date_raw or not selected_store_ids:
             flash("Preencha descricao, vencimento e selecione ao menos uma loja.", "error")
-            return redirect(url_for("payables"))
+            return redirect(url_for("payables", **expense_filter_redirect_args_from_form()))
 
         try:
             due_date_value = datetime.strptime(due_date_raw, "%Y-%m-%d").date()
             selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
             if not selected_stores:
                 flash("Nenhuma loja valida foi selecionada.", "error")
-                return redirect(url_for("payables"))
+                return redirect(url_for("payables", **expense_filter_redirect_args_from_form()))
 
             db.session.add(
                 AccountPayable(
@@ -766,16 +917,22 @@ def payables():
             app.logger.exception("Erro ao cadastrar conta a pagar.")
             flash("Nao foi possivel cadastrar a conta a pagar.", "error")
 
-        return redirect(url_for("payables"))
+        return redirect(url_for("payables", **expense_filter_redirect_args_from_form()))
 
     selected_start, selected_end, month_token = resolve_period_filters(
-        request.args.get("date_from"), request.args.get("date_to")
+        request.args.get("date_from"), request.args.get("date_to"), request.args.get("month")
     )
     selected_store_ids, _ = resolve_selected_stores(stores, request.args.getlist("store_ids"))
+    selected_entry_type = resolve_entry_type_filter(request.args.get("entry_type"))
+    selected_category_code = resolve_category_code_filter(request.args.get("category_code"))
     payable_query = AccountPayable.query.filter(
         AccountPayable.due_date >= selected_start,
         AccountPayable.due_date <= selected_end,
     )
+    if selected_entry_type:
+        payable_query = payable_query.filter(AccountPayable.payable_type == selected_entry_type)
+    if selected_category_code:
+        payable_query = payable_query.filter(AccountPayable.category_code == selected_category_code)
     if selected_store_ids:
         payable_query = (
             payable_query.join(account_payable_stores)
@@ -793,6 +950,8 @@ def payables():
         date_from_value=selected_start.strftime("%Y-%m-%d"),
         date_to_value=selected_end.strftime("%Y-%m-%d"),
         selected_store_ids=selected_store_ids,
+        selected_entry_type=selected_entry_type,
+        selected_category_code=selected_category_code,
         today=date.today(),
         entry_type_choices=ENTRY_TYPE_CHOICES,
         entry_category_choices=ENTRY_CATEGORY_CHOICES,
@@ -803,6 +962,7 @@ def payables():
 def update_payable(payable_id: int):
     payable = AccountPayable.query.get_or_404(payable_id)
     month_token = request.form.get("month") or payable.due_date.strftime("%Y-%m")
+    redirect_args = expense_filter_redirect_args_from_form(month_token)
     description = request.form.get("description", "").strip()
     total_amount_raw = request.form.get("total_amount", "0")
     due_date_raw = request.form.get("due_date")
@@ -814,14 +974,14 @@ def update_payable(payable_id: int):
 
     if not description or not due_date_raw or not selected_store_ids:
         flash("Preencha descricao, vencimento e selecione ao menos uma loja.", "error")
-        return redirect(url_for("payables", month=month_token))
+        return redirect(url_for("payables", **redirect_args))
 
     try:
         due_date_value = datetime.strptime(due_date_raw, "%Y-%m-%d").date()
         selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
         if not selected_stores:
             flash("Nenhuma loja valida foi selecionada.", "error")
-            return redirect(url_for("payables", month=month_token))
+            return redirect(url_for("payables", **redirect_args))
 
         payable.description = description
         payable.total_amount = parse_decimal_input(total_amount_raw)
@@ -838,13 +998,14 @@ def update_payable(payable_id: int):
         app.logger.exception("Erro ao atualizar conta a pagar.")
         flash("Nao foi possivel atualizar a conta a pagar.", "error")
 
-    return redirect(url_for("payables", month=month_token))
+    return redirect(url_for("payables", **redirect_args))
 
 
 @app.route("/payables/<int:payable_id>/delete", methods=["POST"])
 def delete_payable(payable_id: int):
     payable = AccountPayable.query.get_or_404(payable_id)
     month_token = request.form.get("month") or payable.due_date.strftime("%Y-%m")
+    redirect_args = expense_filter_redirect_args_from_form(month_token)
 
     try:
         db.session.delete(payable)
@@ -855,7 +1016,7 @@ def delete_payable(payable_id: int):
         app.logger.exception("Erro ao excluir conta a pagar.")
         flash("Nao foi possivel excluir a conta a pagar.", "error")
 
-    return redirect(url_for("payables", month=month_token))
+    return redirect(url_for("payables", **redirect_args))
 
 
 @app.route("/outflows", methods=["GET", "POST"])
@@ -873,14 +1034,14 @@ def outflows():
 
         if not description or not outflow_date_raw or not selected_store_ids:
             flash("Preencha descricao, data e selecione ao menos uma loja.", "error")
-            return redirect(url_for("outflows"))
+            return redirect(url_for("outflows", **expense_filter_redirect_args_from_form()))
 
         try:
             outflow_date_value = datetime.strptime(outflow_date_raw, "%Y-%m-%d").date()
             selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
             if not selected_stores:
                 flash("Nenhuma loja valida foi selecionada.", "error")
-                return redirect(url_for("outflows"))
+                return redirect(url_for("outflows", **expense_filter_redirect_args_from_form()))
 
             db.session.add(
                 CashOutflow(
@@ -901,16 +1062,22 @@ def outflows():
             app.logger.exception("Erro ao cadastrar saida.")
             flash("Nao foi possivel cadastrar a saida.", "error")
 
-        return redirect(url_for("outflows"))
+        return redirect(url_for("outflows", **expense_filter_redirect_args_from_form()))
 
     selected_start, selected_end, month_token = resolve_period_filters(
-        request.args.get("date_from"), request.args.get("date_to")
+        request.args.get("date_from"), request.args.get("date_to"), request.args.get("month")
     )
     selected_store_ids, _ = resolve_selected_stores(stores, request.args.getlist("store_ids"))
+    selected_entry_type = resolve_entry_type_filter(request.args.get("entry_type"))
+    selected_category_code = resolve_category_code_filter(request.args.get("category_code"))
     outflow_query = CashOutflow.query.filter(
         CashOutflow.outflow_date >= selected_start,
         CashOutflow.outflow_date <= selected_end,
     )
+    if selected_entry_type:
+        outflow_query = outflow_query.filter(CashOutflow.outflow_type == selected_entry_type)
+    if selected_category_code:
+        outflow_query = outflow_query.filter(CashOutflow.category_code == selected_category_code)
     if selected_store_ids:
         outflow_query = (
             outflow_query.join(cash_outflow_stores)
@@ -922,10 +1089,13 @@ def outflows():
         "outflows.html",
         stores=stores,
         outflows=outflow_items,
+        total_outflows_amount=sum((outflow.total_amount for outflow in outflow_items), Decimal("0.00")),
         month_token=month_token,
         date_from_value=selected_start.strftime("%Y-%m-%d"),
         date_to_value=selected_end.strftime("%Y-%m-%d"),
         selected_store_ids=selected_store_ids,
+        selected_entry_type=selected_entry_type,
+        selected_category_code=selected_category_code,
         entry_type_choices=ENTRY_TYPE_CHOICES,
         entry_category_choices=ENTRY_CATEGORY_CHOICES,
     )
@@ -935,6 +1105,7 @@ def outflows():
 def update_outflow(outflow_id: int):
     outflow = CashOutflow.query.get_or_404(outflow_id)
     month_token = request.form.get("month") or outflow.outflow_date.strftime("%Y-%m")
+    redirect_args = expense_filter_redirect_args_from_form(month_token)
     description = request.form.get("description", "").strip()
     total_amount_raw = request.form.get("total_amount", "0")
     outflow_date_raw = request.form.get("outflow_date")
@@ -946,14 +1117,14 @@ def update_outflow(outflow_id: int):
 
     if not description or not outflow_date_raw or not selected_store_ids:
         flash("Preencha descricao, data e selecione ao menos uma loja.", "error")
-        return redirect(url_for("outflows", month=month_token))
+        return redirect(url_for("outflows", **redirect_args))
 
     try:
         outflow_date_value = datetime.strptime(outflow_date_raw, "%Y-%m-%d").date()
         selected_stores = Store.query.filter(Store.id.in_(selected_store_ids)).all()
         if not selected_stores:
             flash("Nenhuma loja valida foi selecionada.", "error")
-            return redirect(url_for("outflows", month=month_token))
+            return redirect(url_for("outflows", **redirect_args))
 
         outflow.description = description
         outflow.total_amount = parse_decimal_input(total_amount_raw)
@@ -970,13 +1141,14 @@ def update_outflow(outflow_id: int):
         app.logger.exception("Erro ao atualizar saida.")
         flash("Nao foi possivel atualizar a saida.", "error")
 
-    return redirect(url_for("outflows", month=month_token))
+    return redirect(url_for("outflows", **redirect_args))
 
 
 @app.route("/outflows/<int:outflow_id>/delete", methods=["POST"])
 def delete_outflow(outflow_id: int):
     outflow = CashOutflow.query.get_or_404(outflow_id)
     month_token = request.form.get("month") or outflow.outflow_date.strftime("%Y-%m")
+    redirect_args = expense_filter_redirect_args_from_form(month_token)
 
     try:
         db.session.delete(outflow)
@@ -987,7 +1159,7 @@ def delete_outflow(outflow_id: int):
         app.logger.exception("Erro ao excluir saida.")
         flash("Nao foi possivel excluir a saida.", "error")
 
-    return redirect(url_for("outflows", month=month_token))
+    return redirect(url_for("outflows", **redirect_args))
 
 
 @app.route("/stores", methods=["GET", "POST"])
@@ -1059,9 +1231,11 @@ def delete_sale(store_id: int, sale_id: int):
 @app.route("/stores/<int:store_id>", methods=["GET", "POST"])
 def store_detail(store_id: int):
     store = Store.query.get_or_404(store_id)
-    selected_month = request.args.get("month")
+    selected_month = request.args.get("month") or current_period_month_token()
     year, month = parse_year_month(selected_month)
     month_token = f"{year:04d}-{month:02d}"
+    if request.args.get("sync_period") == "1":
+        persist_period_filter(date(year, month, 1), date(year, month, monthrange(year, month)[1]))
 
     if request.method == "POST":
         action = request.form.get("action")

@@ -7,7 +7,7 @@
       <ul class="store-list">
         {% for store in stores %}
           <li class="store-list-item">
-            <a href="{{ url_for('store_detail', store_id=store.id) }}" class="store-card-link" aria-label="Entrar na loja {{ store.name }}">
+            <a href="{{ url_for('store_detail', store_id=store.id, month=current_period_month_token()) }}" class="store-card-link" aria-label="Entrar na loja {{ store.name }}">
               <div class="store-list-copy">
                 <strong>{{ store.name }}</strong>
                 <small>Painel da loja</small>

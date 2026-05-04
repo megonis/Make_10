@@ -642,6 +642,14 @@ body.modal-open {
   font-weight: 700;
 }
 
+.payable-description-meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .status-row-overdue .payables-table-date {
   color: #fecaca;
 }
@@ -976,6 +984,10 @@ body.modal-open {
   margin-top: 14px;
 }
 
+.summary-filter-form.expense-filter-form {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .summary-filter-field {
   display: grid;
   gap: 6px;
@@ -988,7 +1000,8 @@ body.modal-open {
   display: block;
 }
 
-.summary-filter-field input {
+.summary-filter-field input,
+.summary-filter-field select {
   min-height: 44px;
   width: 100%;
   min-width: 0;

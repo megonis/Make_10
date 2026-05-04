@@ -4,7 +4,7 @@
   <section class="card">
     <h2>Resumo Geral</h2>
     <!-- Filtro por intervalo de datas para recalcular os indicadores da página. -->
-    <form method="get" class="summary-filter-form">
+    <form method="get" class="summary-filter-form expense-filter-form">
       <label for="date_from" class="summary-filter-field">
         <span>Data inicial</span>
         <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
@@ -54,6 +54,24 @@
           </div>
         </details>
       </div>
+      <label for="entry_type" class="summary-filter-field">
+        <span>Tipo</span>
+        <select id="entry_type" name="entry_type">
+          <option value="">Todos os tipos</option>
+          {% for option_value, option_label in entry_type_choices.items() %}
+            <option value="{{ option_value }}" {% if selected_entry_type == option_value %}selected{% endif %}>{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="filter_category_code" class="summary-filter-field">
+        <span>Categoria</span>
+        <select id="filter_category_code" name="category_code">
+          <option value="">Todas as categorias</option>
+          {% for option_value, option_label in entry_category_choices.items() %}
+            <option value="{{ option_value }}" {% if selected_category_code == option_value %}selected{% endif %}>{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button type="submit" class="summary-filter-button">Atualizar</button>
       <button
         type="submit"
@@ -86,10 +104,12 @@
         <small>Total de despesas</small>
         <strong>{{ money(total_expenses) }}</strong>
       </article>
-      <article class="kpi">
-        <small>Resultado do mês</small>
-        <strong>{{ money(total_result) }}</strong>
-      </article>
+      {% if has_expense_filter %}
+        <article class="kpi">
+          <small>{{ filtered_expense_total_label }}</small>
+          <strong>{{ money(filtered_expense_total) }}</strong>
+        </article>
+      {% endif %}
     </div>
   </section>
 
@@ -106,8 +126,10 @@
             <th>Despesas pessoais</th>
             <th>Mercadoria</th>
             <th>Total despesas</th>
+            {% if has_expense_filter %}
+              <th>Despesas filtradas</th>
+            {% endif %}
             <th>Despesa media por dia</th>
-            <th>Resultado</th>
           </tr>
         </thead>
         <tbody>
@@ -125,8 +147,10 @@
               <td data-label="Despesas pessoais">{{ money(item.data.total_personal_month) }}</td>
               <td data-label="Mercadoria">{{ money(item.data.total_merchandise_month) }}</td>
               <td data-label="Total despesas">{{ money(item.data.total_expenses_month) }}</td>
+              {% if has_expense_filter %}
+                <td data-label="Despesas filtradas">{{ money(item.data.filtered_expense_total_month) }}</td>
+              {% endif %}
               <td data-label="Despesa media por dia">{{ money(item.data.expense_per_day) }}</td>
-              <td data-label="Resultado">{{ money(item.data.month_result) }}</td>
             </tr>
           {% endfor %}
         </tbody>

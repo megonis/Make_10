@@ -13,7 +13,7 @@
       <div class="app-shell">
         <aside class="sidebar" id="app-sidebar">
           <div class="sidebar-brand">
-            <a href="{{ url_for('index') }}" class="sidebar-brand-link">
+            <a href="{{ period_url_for('index') }}" class="sidebar-brand-link">
               <img
                 src="{{ url_for('static', filename='favicon.jpg') }}"
                 alt="Logo MAKE10"
@@ -28,10 +28,10 @@
 
           <!-- Navegação principal no layout lateral. -->
           <nav class="sidebar-nav">
-            <a href="{{ url_for('index') }}" class="nav-link sidebar-link {% if request.endpoint == 'index' %}is-active{% endif %}">Resumo</a>
+            <a href="{{ period_url_for('index') }}" class="nav-link sidebar-link {% if request.endpoint == 'index' %}is-active{% endif %}">Resumo</a>
             <a href="{{ url_for('stores') }}" class="nav-link sidebar-link {% if request.endpoint == 'stores' or request.endpoint == 'store_detail' %}is-active{% endif %}">Lojas</a>
-            <a href="{{ url_for('payables') }}" class="nav-link sidebar-link {% if request.endpoint == 'payables' or request.endpoint == 'update_payable' %}is-active{% endif %}">Contas a Pagar</a>
-            <a href="{{ url_for('outflows') }}" class="nav-link sidebar-link {% if request.endpoint == 'outflows' or request.endpoint == 'update_outflow' %}is-active{% endif %}">Saidas</a>
+            <a href="{{ period_url_for('payables') }}" class="nav-link sidebar-link {% if request.endpoint == 'payables' or request.endpoint == 'update_payable' %}is-active{% endif %}">Contas a Pagar</a>
+            <a href="{{ period_url_for('outflows') }}" class="nav-link sidebar-link {% if request.endpoint == 'outflows' or request.endpoint == 'update_outflow' %}is-active{% endif %}">Saidas</a>
           </nav>
 
           <form method="post" action="{{ url_for('logout') }}" class="sidebar-logout">
@@ -55,7 +55,7 @@
                 <span></span>
               </span>
             </button>
-            <a href="{{ url_for('index') }}" class="mobile-topbar-title">Painel Financeiro</a>
+            <a href="{{ period_url_for('index') }}" class="mobile-topbar-title">Painel Financeiro</a>
           </div>
 
           {% if header_title %}

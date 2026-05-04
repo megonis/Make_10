@@ -6,6 +6,17 @@
   {% set overdue_payables = open_payables | selectattr("due_date", "lt", today) | list %}
   {% set upcoming_payables = open_payables | rejectattr("due_date", "lt", today) | list %}
 
+  {% macro render_filter_state() %}
+    <input type="hidden" name="month" value="{{ month_token }}" />
+    <input type="hidden" name="filter_date_from" value="{{ date_from_value }}" />
+    <input type="hidden" name="filter_date_to" value="{{ date_to_value }}" />
+    <input type="hidden" name="filter_entry_type" value="{{ selected_entry_type }}" />
+    <input type="hidden" name="filter_category_code" value="{{ selected_category_code }}" />
+    {% for store_id in selected_store_ids %}
+      <input type="hidden" name="filter_store_ids" value="{{ store_id }}" />
+    {% endfor %}
+  {% endmacro %}
+
   <!-- Macro reutilizada para exibir tabela agrupada por data e modais de edicao. -->
   {% macro render_payable_table(items) %}
     <div class="payables-date-groups">
@@ -48,6 +59,9 @@
                   <td data-label="Valor" class="payables-table-amount">{{ money(payable.total_amount) }}</td>
                   <td data-label="Descricao" class="payables-table-description">
                     <span class="payable-description-main">{{ payable.description }}</span>
+                    <span class="payable-description-meta">
+                      {{ entry_type_label(payable.payable_type) }} | {{ entry_category_label(payable.category_code) }}
+                    </span>
                   </td>
                 </tr>
               {% endfor %}
@@ -70,7 +84,7 @@
             <span class="status-badge status-{{ status_class }}">{{ status_label }}</span>
           </div>
           <form method="post" action="{{ url_for('update_payable', payable_id=payable.id) }}" class="grid-form payable-form" autocomplete="off">
-            <input type="hidden" name="month" value="{{ month_token }}" />
+            {{ render_filter_state() }}
             <label for="description-{{ payable.id }}">Descricao</label>
             <input id="description-{{ payable.id }}" name="description" value="{{ payable.description }}" required />
 
@@ -142,7 +156,7 @@
             <button type="submit">Salvar alteracoes</button>
           </form>
           <form method="post" action="{{ url_for('delete_payable', payable_id=payable.id) }}" class="danger-form" onsubmit="return confirm('Excluir esta conta a pagar?');">
-            <input type="hidden" name="month" value="{{ month_token }}" />
+            {{ render_filter_state() }}
             <button type="submit" class="danger-button">Excluir conta</button>
           </form>
         </dialog>
@@ -155,7 +169,7 @@
       <h2>Contas a Pagar</h2>
       <button type="button" class="add-entry-button" data-dialog-id="new-payable-dialog">Adicionar conta</button>
     </div>
-    <form method="get" class="summary-filter-form" autocomplete="off">
+    <form method="get" class="summary-filter-form expense-filter-form" autocomplete="off">
       <label for="date_from" class="summary-filter-field">
         <span>Data inicial</span>
         <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
@@ -195,10 +209,28 @@
           </div>
         </details>
       </div>
+      <label for="entry_type" class="summary-filter-field">
+        <span>Tipo</span>
+        <select id="entry_type" name="entry_type">
+          <option value="">Todos os tipos</option>
+          {% for option_value, option_label in entry_type_choices.items() %}
+            <option value="{{ option_value }}" {% if selected_entry_type == option_value %}selected{% endif %}>{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="filter_category_code" class="summary-filter-field">
+        <span>Categoria</span>
+        <select id="filter_category_code" name="category_code">
+          <option value="">Todas as categorias</option>
+          {% for option_value, option_label in entry_category_choices.items() %}
+            <option value="{{ option_value }}" {% if selected_category_code == option_value %}selected{% endif %}>{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button type="submit" class="summary-filter-button">Atualizar</button>
     </form>
     <div class="payables-period-total">
-      <span>Total de contas no periodo selecionado</span>
+      <span>Total de contas no periodo filtrado</span>
       <strong>{{ money(total_payables_amount) }}</strong>
     </div>
   </section>
@@ -252,6 +284,7 @@
       <h3>Adicionar Conta a Pagar</h3>
     </div>
     <form method="post" class="grid-form payable-form compact-entry-form" autocomplete="off">
+      {{ render_filter_state() }}
       <label for="description" class="entry-form-field entry-field-description">
         <span>Descricao</span>
         <input id="description" name="description" required placeholder="Imposto, despesa geral, fornecedor..." />

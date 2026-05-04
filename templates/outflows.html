@@ -1,12 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
+  {% macro render_filter_state() %}
+    <input type="hidden" name="month" value="{{ month_token }}" />
+    <input type="hidden" name="filter_date_from" value="{{ date_from_value }}" />
+    <input type="hidden" name="filter_date_to" value="{{ date_to_value }}" />
+    <input type="hidden" name="filter_entry_type" value="{{ selected_entry_type }}" />
+    <input type="hidden" name="filter_category_code" value="{{ selected_category_code }}" />
+    {% for store_id in selected_store_ids %}
+      <input type="hidden" name="filter_store_ids" value="{{ store_id }}" />
+    {% endfor %}
+  {% endmacro %}
+
   <!-- Filtro do mês que controla a listagem e os formulários da tela de saídas. -->
   <section class="card">
     <div class="section-title-row">
       <h2>Saidas</h2>
       <button type="button" class="add-entry-button" data-dialog-id="new-outflow-dialog">Adicionar saida</button>
     </div>
-    <form method="get" class="summary-filter-form" autocomplete="off">
+    <form method="get" class="summary-filter-form expense-filter-form" autocomplete="off">
       <label for="date_from" class="summary-filter-field">
         <span>Data inicial</span>
         <input id="date_from" name="date_from" type="date" value="{{ date_from_value }}" />
@@ -46,8 +57,30 @@
           </div>
         </details>
       </div>
+      <label for="entry_type" class="summary-filter-field">
+        <span>Tipo</span>
+        <select id="entry_type" name="entry_type">
+          <option value="">Todos os tipos</option>
+          {% for option_value, option_label in entry_type_choices.items() %}
+            <option value="{{ option_value }}" {% if selected_entry_type == option_value %}selected{% endif %}>{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label for="filter_category_code" class="summary-filter-field">
+        <span>Categoria</span>
+        <select id="filter_category_code" name="category_code">
+          <option value="">Todas as categorias</option>
+          {% for option_value, option_label in entry_category_choices.items() %}
+            <option value="{{ option_value }}" {% if selected_category_code == option_value %}selected{% endif %}>{{ option_label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button type="submit" class="summary-filter-button">Atualizar</button>
     </form>
+    <div class="payables-period-total">
+      <span>Total de saidas no periodo filtrado</span>
+      <strong>{{ money(total_outflows_amount) }}</strong>
+    </div>
   </section>
 
   <!-- Painel expansível com todas as saídas cadastradas para o mês selecionado. -->
@@ -113,7 +146,7 @@
                 <span class="status-badge status-paid">Pago</span>
               </div>
               <form method="post" action="{{ url_for('update_outflow', outflow_id=outflow.id) }}" class="grid-form payable-form" autocomplete="off">
-                <input type="hidden" name="month" value="{{ month_token }}" />
+                {{ render_filter_state() }}
                 <label for="description-{{ outflow.id }}">Descricao</label>
                 <input id="description-{{ outflow.id }}" name="description" value="{{ outflow.description }}" required />
 
@@ -180,7 +213,7 @@
                 <button type="submit">Salvar alteracoes</button>
               </form>
               <form method="post" action="{{ url_for('delete_outflow', outflow_id=outflow.id) }}" class="danger-form" onsubmit="return confirm('Excluir esta saida?');">
-                <input type="hidden" name="month" value="{{ month_token }}" />
+                {{ render_filter_state() }}
                 <button type="submit" class="danger-button">Excluir saida</button>
               </form>
             </dialog>
@@ -201,6 +234,7 @@
       <h3>Adicionar Saida</h3>
     </div>
     <form method="post" class="grid-form payable-form compact-entry-form" autocomplete="off">
+      {{ render_filter_state() }}
       <label for="description" class="entry-form-field entry-field-description">
         <span>Descricao</span>
         <input id="description" name="description" required placeholder="Material de limpeza, manutencao, frete..." />

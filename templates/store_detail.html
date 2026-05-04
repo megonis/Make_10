@@ -19,6 +19,7 @@
       <form method="get" class="inline-form" autocomplete="off">
         <label for="month">Mês de análise</label>
         <input id="month" name="month" type="month" value="{{ month_token }}" />
+        <input type="hidden" name="sync_period" value="1" />
         <button type="submit">Atualizar</button>
       </form>
       <div class="kpi-grid">
